@@ -1,18 +1,24 @@
 using RapPhim.Models;
+using RapPhim.Services;
 
 namespace RapPhim.Data
 {
     /// <summary>
-    /// Central data manager — stores movies, rooms, and schedules.
-    /// Uses in-memory sample data (can be replaced with a database later).
+    /// Central data holder — movies, rooms, and showtimes.
+    /// Showtimes are persisted through <see cref="Repository"/> (JSON file by default).
+    /// Scheduling rules live in <see cref="LichChieuService"/>; the public methods below are thin
+    /// wrappers kept for backward compatibility.
     /// </summary>
     public static class DataManager
     {
         private static int _nextLichChieuId = 1;
 
+        /// <summary>Storage backend. Replace with a SQL implementation of ILichChieuRepository later.</summary>
+        public static ILichChieuRepository Repository { get; set; } = new JsonLichChieuRepository();
+
         static DataManager()
         {
-            TaoDuLieuMau();
+            KhoiTaoLichChieu();
         }
 
         // ===== SAMPLE MOVIES =====
@@ -41,156 +47,125 @@ namespace RapPhim.Data
         // ===== SCHEDULE LIST =====
         public static List<LichChieu> DanhSachLichChieu { get; } = new List<LichChieu>();
 
-        /// <summary>
-        /// Check if a new showtime conflicts with existing ones in the same room.
-        /// 
-        /// CONFLICT DETECTION LOGIC:
-        /// Two showtimes overlap when: new.start < old.end AND new.end > old.start
-        /// (same room only)
-        /// 
-        /// Adds 15-minute buffer between showtimes for room cleanup.
-        /// </summary>
-        public static LichChieu? KiemTraTrungGio(int maPhong, DateTime gioBatDau, DateTime gioKetThuc, int maLichChieuHienTai = -1)
+        // =====================================================
+        // PERSISTENCE
+        // =====================================================
+
+        private static void KhoiTaoLichChieu()
         {
-            const int BUFFER_MINUTES = 15; // 15-min gap between showtimes for cleanup
-
-            foreach (var existing in DanhSachLichChieu)
+            try
             {
-                // Skip the showtime being edited
-                if (existing.MaLichChieu == maLichChieuHienTai)
-                    continue;
-
-                // Only check same room
-                if (existing.MaPhong != maPhong)
-                    continue;
-
-                // Add 15-min buffer after each showtime
-                DateTime existingEndWithBuffer = existing.GioKetThuc.AddMinutes(BUFFER_MINUTES);
-                DateTime newEndWithBuffer = gioKetThuc.AddMinutes(BUFFER_MINUTES);
-
-                // Check time overlap:
-                // New starts before existing ends (+ buffer)
-                // AND new ends (+ buffer) after existing starts
-                bool hasConflict = gioBatDau < existingEndWithBuffer && newEndWithBuffer > existing.GioBatDau;
-
-                if (hasConflict)
+                if (Repository.HasData())
                 {
-                    return existing; // Return conflicting showtime
+                    DanhSachLichChieu.Clear();
+                    DanhSachLichChieu.AddRange(Repository.LoadAll());
+                    DongBoTenTuPhimPhong();
+                    _nextLichChieuId = DanhSachLichChieu.Count == 0 ? 1 : DanhSachLichChieu.Max(l => l.MaLichChieu) + 1;
+                    return;
                 }
             }
+            catch (Exception)
+            {
+                // Unreadable store: fall back to sample data below.
+            }
 
-            return null; // No conflict
+            TaoDuLieuMau();
+            Luu();
         }
 
-        /// <summary>
-        /// Add a new showtime. Returns success status and message.
-        /// </summary>
+        /// <summary>Refresh the cached movie/room names in loaded showtimes (they may have been renamed).</summary>
+        private static void DongBoTenTuPhimPhong()
+        {
+            foreach (var l in DanhSachLichChieu)
+            {
+                var phim = DanhSachPhim.FirstOrDefault(p => p.MaPhim == l.MaPhim);
+                var phong = DanhSachPhongChieu.FirstOrDefault(p => p.MaPhong == l.MaPhong);
+                if (phim != null) l.TenPhim = phim.TenPhim;
+                if (phong != null) l.TenPhong = phong.TenPhong;
+            }
+        }
+
+        /// <summary>Next free showtime id.</summary>
+        public static int CapPhatMa() => _nextLichChieuId++;
+
+        /// <summary>Save showtimes to the repository. Returns false if saving failed (app keeps working).</summary>
+        public static bool Luu()
+        {
+            try
+            {
+                Repository.SaveAll(DanhSachLichChieu);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // =====================================================
+        // BACKWARD-COMPATIBLE WRAPPERS (logic is in LichChieuService)
+        // =====================================================
+
+        public static LichChieu? KiemTraTrungGio(int maPhong, DateTime gioBatDau, DateTime gioKetThuc, int maLichChieuHienTai = -1)
+            => LichChieuService.TimXungDot(DanhSachLichChieu, maPhong, gioBatDau, gioKetThuc, maLichChieuHienTai);
+
         public static (bool Success, string Message, LichChieu? Conflict) ThemLichChieu(int maPhim, int maPhong, DateTime gioBatDau)
         {
-            var phim = DanhSachPhim.FirstOrDefault(p => p.MaPhim == maPhim);
-            var phong = DanhSachPhongChieu.FirstOrDefault(p => p.MaPhong == maPhong);
-
-            if (phim == null) return (false, "Movie not found!", null);
-            if (phong == null) return (false, "Room not found!", null);
-
-            DateTime gioKetThuc = gioBatDau.AddMinutes(phim.ThoiLuong);
-
-            // *** CHECK FOR TIME CONFLICT ***
-            var conflict = KiemTraTrungGio(maPhong, gioBatDau, gioKetThuc);
-            if (conflict != null)
-            {
-                string msg = $"TIME CONFLICT!\n\n" +
-                    $"\"{phong.TenPhong}\" already has a showtime:\n" +
-                    $"  Movie: {conflict.TenPhim}\n" +
-                    $"  From: {conflict.GioBatDau:HH:mm dd/MM/yyyy}\n" +
-                    $"  To: {conflict.GioKetThuc:HH:mm dd/MM/yyyy}\n\n" +
-                    $"(Minimum 15-minute gap required between showtimes)";
-                return (false, msg, conflict);
-            }
-
-            var newSchedule = new LichChieu
-            {
-                MaLichChieu = _nextLichChieuId++,
-                MaPhim = maPhim,
-                MaPhong = maPhong,
-                GioBatDau = gioBatDau,
-                GioKetThuc = gioKetThuc,
-                SoVeDaBan = 0,
-                TenPhim = phim.TenPhim,
-                TenPhong = phong.TenPhong,
-                ThoiLuongPhim = phim.ThoiLuong
-            };
-
-            DanhSachLichChieu.Add(newSchedule);
-            return (true, $"Showtime scheduled successfully!\n\nMovie: {phim.TenPhim}\nRoom: {phong.TenPhong}\nTime: {gioBatDau:HH:mm} - {gioKetThuc:HH:mm dd/MM/yyyy}", null);
+            var kq = LichChieuService.Them(maPhim, maPhong, gioBatDau);
+            return (kq.ThanhCong, kq.ThongBao, kq.LichXungDot);
         }
 
-        /// <summary>
-        /// Update a showtime (only allowed if no tickets sold).
-        /// </summary>
         public static (bool Success, string Message) CapNhatLichChieu(int maLichChieu, int maPhim, int maPhong, DateTime gioBatDau)
         {
-            var lichChieu = DanhSachLichChieu.FirstOrDefault(l => l.MaLichChieu == maLichChieu);
-            if (lichChieu == null) return (false, "Showtime not found!");
-            if (lichChieu.SoVeDaBan > 0) return (false, "Cannot edit! Tickets have already been sold for this showtime.");
-
-            var phim = DanhSachPhim.FirstOrDefault(p => p.MaPhim == maPhim);
-            var phong = DanhSachPhongChieu.FirstOrDefault(p => p.MaPhong == maPhong);
-
-            if (phim == null) return (false, "Movie not found!");
-            if (phong == null) return (false, "Room not found!");
-
-            DateTime gioKetThuc = gioBatDau.AddMinutes(phim.ThoiLuong);
-
-            // Check conflict (skip current showtime being edited)
-            var conflict = KiemTraTrungGio(maPhong, gioBatDau, gioKetThuc, maLichChieu);
-            if (conflict != null)
-            {
-                return (false, $"TIME CONFLICT with: {conflict.TenPhim} ({conflict.GioBatDau:HH:mm} - {conflict.GioKetThuc:HH:mm})");
-            }
-
-            lichChieu.MaPhim = maPhim;
-            lichChieu.MaPhong = maPhong;
-            lichChieu.GioBatDau = gioBatDau;
-            lichChieu.GioKetThuc = gioKetThuc;
-            lichChieu.TenPhim = phim.TenPhim;
-            lichChieu.TenPhong = phong.TenPhong;
-            lichChieu.ThoiLuongPhim = phim.ThoiLuong;
-
-            return (true, "Showtime updated successfully!");
+            var kq = LichChieuService.CapNhat(maLichChieu, maPhim, maPhong, gioBatDau);
+            return (kq.ThanhCong, kq.ThongBao);
         }
 
-        /// <summary>
-        /// Delete a showtime (only allowed if no tickets sold).
-        /// </summary>
         public static (bool Success, string Message) XoaLichChieu(int maLichChieu)
         {
-            var lichChieu = DanhSachLichChieu.FirstOrDefault(l => l.MaLichChieu == maLichChieu);
-            if (lichChieu == null) return (false, "Showtime not found!");
-            if (lichChieu.SoVeDaBan > 0) return (false, "Cannot delete! Tickets have already been sold for this showtime.");
-
-            DanhSachLichChieu.Remove(lichChieu);
-            return (true, "Showtime deleted successfully!");
+            var kq = LichChieuService.Xoa(maLichChieu);
+            return (kq.ThanhCong, kq.ThongBao);
         }
 
+        // =====================================================
+        // SAMPLE DATA
+        // =====================================================
+
         /// <summary>
-        /// Create sample data for demo purposes.
+        /// Create sample showtimes for tomorrow (so they are editable in a demo).
+        /// Bypasses the "not in the past" rule on purpose.
         /// </summary>
         public static void TaoDuLieuMau()
         {
             if (DanhSachLichChieu.Count > 0) return;
 
-            var today = DateTime.Today;
+            var ngay = DateTime.Today.AddDays(1);
+            (int phim, int phong, int gio)[] mau =
+            {
+                (1, 1, 9), (2, 1, 13), (3, 2, 10), (4, 3, 14), (5, 2, 15)
+            };
 
-            ThemLichChieu(1, 1, today.AddHours(9));
-            ThemLichChieu(2, 1, today.AddHours(13));
-            ThemLichChieu(3, 2, today.AddHours(10));
-            ThemLichChieu(4, 3, today.AddHours(14));
-            ThemLichChieu(5, 2, today.AddHours(15));
+            foreach (var (maPhim, maPhong, gio) in mau)
+            {
+                var phim = DanhSachPhim.First(p => p.MaPhim == maPhim);
+                var phong = DanhSachPhongChieu.First(p => p.MaPhong == maPhong);
+                var bd = ngay.AddHours(gio);
+                DanhSachLichChieu.Add(new LichChieu
+                {
+                    MaLichChieu = _nextLichChieuId++,
+                    MaPhim = maPhim,
+                    MaPhong = maPhong,
+                    GioBatDau = bd,
+                    GioKetThuc = bd.AddMinutes(phim.ThoiLuong),
+                    SoVeDaBan = 0,
+                    TenPhim = phim.TenPhim,
+                    TenPhong = phong.TenPhong,
+                    ThoiLuongPhim = phim.ThoiLuong
+                });
+            }
 
-            // Simulate one showtime with tickets sold (cannot edit/delete)
-            var soldShowtime = DanhSachLichChieu.FirstOrDefault(l => l.MaPhim == 1);
-            if (soldShowtime != null) soldShowtime.SoVeDaBan = 25;
+            // One showtime already has tickets sold (locked: cannot edit/delete)
+            DanhSachLichChieu[0].SoVeDaBan = 25;
         }
     }
 }
