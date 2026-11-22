@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="RapPhim.Tests/RapPhim.Tests.csproj" />
   <Project Path="RapPhim/RapPhim.csproj" />
 </Solution>

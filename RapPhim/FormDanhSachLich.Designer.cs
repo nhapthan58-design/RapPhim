@@ -30,6 +30,8 @@ namespace RapPhim
             dtpLocNgay = new DateTimePicker();
             chkTatCaNgay = new CheckBox();
             btnLoc = new Button();
+            txtTimPhim = new TextBox();
+            lblLyDoKhoa = new Label();
 
             dgvDanhSach = new DataGridView();
 
@@ -73,7 +75,7 @@ namespace RapPhim
             panelFilter.Location = new Point(0, 58);
             panelFilter.Size = new Size(1060, 52);
             panelFilter.Controls.AddRange(new Control[] {
-                lblLocPhong, cboLocPhong, lblLocNgay, dtpLocNgay, chkTatCaNgay, btnLoc
+                lblLocPhong, cboLocPhong, lblLocNgay, dtpLocNgay, chkTatCaNgay, btnLoc, txtTimPhim
             });
 
             lblLocPhong.Text = "Room:";
@@ -119,6 +121,16 @@ namespace RapPhim
             btnLoc.Cursor = Cursors.Hand;
             btnLoc.Click += btnLoc_Click;
 
+            // txtTimPhim - live movie search
+            txtTimPhim.Font = new Font("Segoe UI", 10F);
+            txtTimPhim.PlaceholderText = "Search movie...";
+            txtTimPhim.BackColor = Color.FromArgb(18, 18, 20);
+            txtTimPhim.ForeColor = Color.FromArgb(244, 244, 245);
+            txtTimPhim.BorderStyle = BorderStyle.FixedSingle;
+            txtTimPhim.Location = new Point(780, 12);
+            txtTimPhim.Size = new Size(250, 30);
+            txtTimPhim.TextChanged += txtTimPhim_TextChanged;
+
             // =============================================
             // dgvDanhSach - Main Data Grid
             // =============================================
@@ -156,6 +168,9 @@ namespace RapPhim
 
             dgvDanhSach.RowTemplate.Height = 36;
             dgvDanhSach.CellFormatting += dgvDanhSach_CellFormatting;
+            dgvDanhSach.SelectionChanged += dgvDanhSach_SelectionChanged;
+            dgvDanhSach.CellDoubleClick += dgvDanhSach_CellDoubleClick;
+            dgvDanhSach.KeyDown += dgvDanhSach_KeyDown;
 
             // =============================================
             // panelBottom - Footer Action Bar
@@ -163,7 +178,13 @@ namespace RapPhim
             panelBottom.BackColor = Color.FromArgb(24, 24, 28);
             panelBottom.Location = new Point(0, 535);
             panelBottom.Size = new Size(1060, 60);
-            panelBottom.Controls.AddRange(new Control[] { lblTongSuat, btnSua, btnXoa, btnDong });
+            panelBottom.Controls.AddRange(new Control[] { lblTongSuat, lblLyDoKhoa, btnSua, btnXoa, btnDong });
+
+            lblLyDoKhoa.Text = "";
+            lblLyDoKhoa.Font = new Font("Segoe UI", 9.5F, FontStyle.Italic);
+            lblLyDoKhoa.ForeColor = Color.FromArgb(251, 191, 36);
+            lblLyDoKhoa.Location = new Point(230, 21);
+            lblLyDoKhoa.Size = new Size(410, 22);
 
             lblTongSuat.Text = "Total: 0 showtimes";
             lblTongSuat.Font = new Font("Segoe UI Semibold", 10.5F, FontStyle.Bold);
@@ -246,7 +267,8 @@ namespace RapPhim
         private DateTimePicker dtpLocNgay;
         private CheckBox chkTatCaNgay;
         private Button btnLoc;
-
+        private TextBox txtTimPhim;
+        private Label lblLyDoKhoa;
         private DataGridView dgvDanhSach;
 
         private Panel panelBottom;

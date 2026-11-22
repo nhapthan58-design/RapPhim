@@ -1,0 +1,17 @@
+# Auto-detect text files, normalize to LF in repo
+* text=auto
+
+# Windows-friendly source files
+*.cs     text eol=crlf
+*.resx   text eol=crlf
+*.csproj text eol=crlf
+*.slnx   text eol=crlf
+*.sln    text eol=crlf
+*.json   text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

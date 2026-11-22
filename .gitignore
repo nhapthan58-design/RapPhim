@@ -1,13 +1,26 @@
 ## .NET / Visual Studio
 bin/
 obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+.vs/
 *.user
 *.suo
+*.rsuser
 *.cache
 *.dll
 *.exe
 *.pdb
-.vs/
+TestResults/
+packages/
+*.nupkg
+
+## Secrets / local config
+.env
+*.local.json
+appsettings.Development.json
 
 ## OS files
 Thumbs.db
