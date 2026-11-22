@@ -36,6 +36,8 @@ namespace RapPhim
             lblThoiLuongValue = new Label();
             lblGioKetThuc = new Label();
             lblGioKetThucValue = new Label();
+            btnGoiYGio = new Button();
+            lblTrangThaiSlot = new Label();
 
             panelButtons = new Panel();
             btnXepLich = new Button();
@@ -88,7 +90,8 @@ namespace RapPhim
                 lblNgayChieu, dtpNgayChieu,
                 lblGioChieu, dtpGioChieu,
                 lblThoiLuong, lblThoiLuongValue,
-                lblGioKetThuc, lblGioKetThucValue
+                lblGioKetThuc, lblGioKetThucValue,
+                btnGoiYGio, lblTrangThaiSlot
             });
 
             // --- Select Movie ---
@@ -145,11 +148,32 @@ namespace RapPhim
             lblGioChieu.Size = new Size(95, 25);
 
             dtpGioChieu.Font = new Font("Segoe UI", 10F);
-            dtpGioChieu.Format = DateTimePickerFormat.Time;
+            dtpGioChieu.Format = DateTimePickerFormat.Custom;
+            dtpGioChieu.CustomFormat = "HH:mm";
             dtpGioChieu.ShowUpDown = true;
             dtpGioChieu.Location = new Point(125, 170);
-            dtpGioChieu.Size = new Size(305, 30);
+            dtpGioChieu.Size = new Size(190, 30);
             dtpGioChieu.ValueChanged += dtpGioChieu_ValueChanged;
+
+            // --- Suggest next free slot ---
+            btnGoiYGio.Text = "Next free slot";
+            btnGoiYGio.Font = new Font("Segoe UI", 9F);
+            btnGoiYGio.BackColor = Color.FromArgb(39, 39, 42);
+            btnGoiYGio.ForeColor = Color.FromArgb(228, 228, 231);
+            btnGoiYGio.FlatStyle = FlatStyle.Flat;
+            btnGoiYGio.FlatAppearance.BorderColor = Color.FromArgb(63, 63, 70);
+            btnGoiYGio.FlatAppearance.BorderSize = 1;
+            btnGoiYGio.Location = new Point(325, 168);
+            btnGoiYGio.Size = new Size(105, 32);
+            btnGoiYGio.Cursor = Cursors.Hand;
+            btnGoiYGio.Click += btnGoiYGio_Click;
+
+            // --- Live slot status ---
+            lblTrangThaiSlot.Text = "";
+            lblTrangThaiSlot.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
+            lblTrangThaiSlot.ForeColor = Color.FromArgb(161, 161, 170);
+            lblTrangThaiSlot.Location = new Point(20, 295);
+            lblTrangThaiSlot.Size = new Size(410, 24);
 
             // --- Duration ---
             lblThoiLuong.Text = "Duration:";
@@ -308,6 +332,8 @@ namespace RapPhim
         private Label lblThoiLuongValue;
         private Label lblGioKetThuc;
         private Label lblGioKetThucValue;
+        private Button btnGoiYGio;
+        private Label lblTrangThaiSlot;
 
         private Panel panelButtons;
         private Button btnXepLich;
