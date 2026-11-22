@@ -13,9 +13,10 @@ namespace RapPhim.Data
 
         public JsonLichChieuRepository(string? filePath = null)
         {
-            _filePath = filePath ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "RapPhim", "lichchieu.json");
+            // RAPPHIM_DATA_DIR lets tests / other environments redirect storage away from %AppData%.
+            string baseDir = Environment.GetEnvironmentVariable("RAPPHIM_DATA_DIR")
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RapPhim");
+            _filePath = filePath ?? Path.Combine(baseDir, "lichchieu.json");
         }
 
         public string FilePath => _filePath;
