@@ -188,6 +188,42 @@ namespace RapPhim
             }
 
             lblTongSuat.Text = $"Total: {tong} · Available: {conTrong} · Locked: {khoa} · Ended: {daChieu}";
+            CapNhatTimeline();
+            CapNhatNutTheoDongChon();
+        }
+
+        private void CapNhatTimeline()
+        {
+            DateTime ngayTimeline = chkTatCaNgay.Checked ? LichChieuService.Now().Date : dtpLocNgay.Value.Date;
+            IEnumerable<PhongChieu> phongHienThi = cboLocPhong.SelectedValue is int maPhong && maPhong != 0
+                ? DataManager.DanhSachPhongChieu.Where(p => p.MaPhong == maPhong)
+                : DataManager.DanhSachPhongChieu;
+
+            int maChon = LayLichChieuDangChon(baoNeuKhongChon: false)?.MaLichChieu ?? -1;
+            timelineLichChieu.NapDuLieu(ngayTimeline, phongHienThi, DataManager.DanhSachLichChieu, maChon);
+        }
+
+        private void btnCheDoXem_Click(object? sender, EventArgs e)
+        {
+            bool sangTimeline = !timelineLichChieu.Visible;
+            timelineLichChieu.Visible = sangTimeline;
+            dgvDanhSach.Visible = !sangTimeline;
+            btnCheDoXem.Text = sangTimeline ? "📋 Table" : "📊 Timeline";
+            if (sangTimeline) CapNhatTimeline();
+        }
+
+        private void timelineLichChieu_SuatDuocChon(int maLichChieu)
+        {
+            for (int i = 0; i < dgvDanhSach.Rows.Count; i++)
+            {
+                if (dgvDanhSach.Rows[i].DataBoundItem is LichChieuViewModel vm && vm.ID == maLichChieu)
+                {
+                    dgvDanhSach.ClearSelection();
+                    dgvDanhSach.Rows[i].Selected = true;
+                    dgvDanhSach.CurrentCell = dgvDanhSach.Rows[i].Cells[0];
+                    break;
+                }
+            }
             CapNhatNutTheoDongChon();
         }
 

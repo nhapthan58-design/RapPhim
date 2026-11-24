@@ -32,9 +32,11 @@ namespace RapPhim
             chkAnDaChieu = new CheckBox();
             btnLoc = new Button();
             txtTimPhim = new TextBox();
+            btnCheDoXem = new Button();
             lblLyDoKhoa = new Label();
 
             dgvDanhSach = new DataGridView();
+            timelineLichChieu = new UI.TimelineLichChieu();
 
             panelBottom = new Panel();
             btnSaoChep = new Button();
@@ -77,7 +79,7 @@ namespace RapPhim
             panelFilter.Location = new Point(0, 58);
             panelFilter.Size = new Size(1060, 52);
             panelFilter.Controls.AddRange(new Control[] {
-                lblLocPhong, cboLocPhong, lblLocNgay, dtpLocNgay, chkTatCaNgay, chkAnDaChieu, btnLoc, txtTimPhim
+                lblLocPhong, cboLocPhong, lblLocNgay, dtpLocNgay, chkTatCaNgay, chkAnDaChieu, btnLoc, txtTimPhim, btnCheDoXem
             });
 
             lblLocPhong.Text = "Room:";
@@ -141,6 +143,19 @@ namespace RapPhim
             txtTimPhim.Size = new Size(205, 28);
             txtTimPhim.TextChanged += txtTimPhim_TextChanged;
 
+            // btnCheDoXem - toggle Table / Timeline
+            btnCheDoXem.Text = "📊 Timeline";
+            btnCheDoXem.Font = new Font("Segoe UI Bold", 9F, FontStyle.Bold);
+            btnCheDoXem.BackColor = Color.FromArgb(39, 39, 42);
+            btnCheDoXem.ForeColor = Color.FromArgb(244, 244, 245);
+            btnCheDoXem.FlatStyle = FlatStyle.Flat;
+            btnCheDoXem.FlatAppearance.BorderColor = Color.FromArgb(63, 63, 70);
+            btnCheDoXem.FlatAppearance.BorderSize = 1;
+            btnCheDoXem.Location = new Point(938, 9);
+            btnCheDoXem.Size = new Size(107, 34);
+            btnCheDoXem.Cursor = Cursors.Hand;
+            btnCheDoXem.Click += btnCheDoXem_Click;
+
             // =============================================
             // dgvDanhSach - Main Data Grid
             // =============================================
@@ -182,6 +197,12 @@ namespace RapPhim
             dgvDanhSach.CellDoubleClick += dgvDanhSach_CellDoubleClick;
             dgvDanhSach.KeyDown += dgvDanhSach_KeyDown;
             dgvDanhSach.ColumnHeaderMouseClick += dgvDanhSach_ColumnHeaderMouseClick;
+
+            // timelineLichChieu - visual day timeline (hidden until toggled)
+            timelineLichChieu.Location = new Point(15, 125);
+            timelineLichChieu.Size = new Size(1030, 395);
+            timelineLichChieu.Visible = false;
+            timelineLichChieu.SuatDuocChon += timelineLichChieu_SuatDuocChon;
 
             // =============================================
             // panelBottom - Footer Action Bar
@@ -261,6 +282,7 @@ namespace RapPhim
             Controls.Add(panelTopBar);
             Controls.Add(panelFilter);
             Controls.Add(dgvDanhSach);
+            Controls.Add(timelineLichChieu);
             Controls.Add(panelBottom);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -292,8 +314,10 @@ namespace RapPhim
         private CheckBox chkAnDaChieu;
         private Button btnLoc;
         private TextBox txtTimPhim;
+        private Button btnCheDoXem;
         private Label lblLyDoKhoa;
         private DataGridView dgvDanhSach;
+        private UI.TimelineLichChieu timelineLichChieu;
 
         private Panel panelBottom;
         private Button btnSaoChep;
