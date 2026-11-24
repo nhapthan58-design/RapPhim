@@ -12,6 +12,12 @@ namespace RapPhim.Services
         /// <summary>Gap (minutes) required between two showtimes in the same room for cleaning.</summary>
         public const int BUFFER_PHUT = 15;
 
+        /// <summary>Earliest allowed showtime start hour (08:00).</summary>
+        public const int GIO_MO_CUA = 8;
+
+        /// <summary>Latest allowed showtime start time (23:30). Ending past midnight is permitted.</summary>
+        public static readonly TimeSpan GIO_BAT_DAU_MUON_NHAT = new(23, 30, 0);
+
         /// <summary>Clock used by the service (replaceable in tests).</summary>
         public static Func<DateTime> Now { get; set; } = () => DateTime.Now;
 
@@ -38,10 +44,10 @@ namespace RapPhim.Services
             return null;
         }
 
-        /// <summary>A showtime is locked once tickets are sold or it has already started.</summary>
-        public static bool CoTheSuaXoa(LichChieu l, DateTime now, out string lyDo)
+        /// <summary>Pure lock check: a showtime is locked once tickets are sold or it has already started.</summary>
+        public static bool CoTheSuaXoa(LichChieu l, DateTime now, int soVeDaBan, out string lyDo)
         {
-            if (l.SoVeDaBan > 0)
+            if (soVeDaBan > 0)
             {
                 lyDo = "Tickets already sold for this showtime.";
                 return false;
@@ -53,6 +59,13 @@ namespace RapPhim.Services
             }
             lyDo = string.Empty;
             return true;
+        }
+
+        /// <summary>Lock check using <see cref="DataManager.VeDaBanProvider"/> for sold ticket count.</summary>
+        public static bool CoTheSuaXoa(LichChieu l, DateTime now, out string lyDo)
+        {
+            int soVe = DataManager.VeDaBanProvider.DemVeDaBan(l.MaLichChieu);
+            return CoTheSuaXoa(l, now, soVe, out lyDo);
         }
 
         public static bool CoTheSuaXoa(LichChieu l, out string lyDo) => CoTheSuaXoa(l, Now(), out lyDo);
@@ -109,6 +122,9 @@ namespace RapPhim.Services
 
             if (bd <= Now()) return new KetQua(false, "Cannot schedule a showtime in the past.");
 
+            if (bd.TimeOfDay < TimeSpan.FromHours(GIO_MO_CUA) || bd.TimeOfDay > GIO_BAT_DAU_MUON_NHAT)
+                return new KetQua(false, "Showtime must start between 08:00 and 23:30.");
+
             var xungDot = TimXungDot(DataManager.DanhSachLichChieu, maPhong, bd, kt, boQuaMa);
             if (xungDot != null)
                 return new KetQua(false,
@@ -124,6 +140,7 @@ namespace RapPhim.Services
 
         public static KetQua Them(int maPhim, int maPhong, DateTime batDau)
         {
+            DataManager.TaiLai();
             var v = Validate(maPhim, maPhong, batDau, -1, out var phim, out var phong, out var bd, out var kt);
             if (!v.ThanhCong)
             {
@@ -143,7 +160,6 @@ namespace RapPhim.Services
 
             var moi = new LichChieu
             {
-                MaLichChieu = DataManager.CapPhatMa(),
                 MaPhim = maPhim,
                 MaPhong = maPhong,
                 GioBatDau = bd,
@@ -153,16 +169,25 @@ namespace RapPhim.Services
                 TenPhong = phong!.TenPhong,
                 ThoiLuongPhim = phim.ThoiLuong
             };
-            DataManager.DanhSachLichChieu.Add(moi);
-            bool luu = DataManager.Luu();
 
+            try
+            {
+                DataManager.Repository.Insert(moi);
+            }
+            catch (Exception ex)
+            {
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
             return new KetQua(true,
                 $"Showtime scheduled successfully!\n\nMovie: {phim.TenPhim}\nRoom: {phong.TenPhong}\n" +
-                $"Time: {bd:HH:mm} - {kt:HH:mm dd/MM/yyyy}" + (luu ? "" : "\n\n(Warning: could not save to disk)"));
+                $"Time: {bd:HH:mm} - {kt:HH:mm dd/MM/yyyy}");
         }
 
         public static KetQua CapNhat(int maLichChieu, int maPhim, int maPhong, DateTime batDau)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
             if (!CoTheSuaXoa(l, out var lyDo)) return new KetQua(false, "Cannot edit! " + lyDo);
@@ -171,27 +196,50 @@ namespace RapPhim.Services
             if (!v.ThanhCong)
                 return v.LichXungDot != null ? new KetQua(false, "TIME CONFLICT: " + v.ThongBao, v.LichXungDot) : v;
 
-            l.MaPhim = maPhim;
-            l.MaPhong = maPhong;
-            l.GioBatDau = bd;
-            l.GioKetThuc = kt;
-            l.TenPhim = phim!.TenPhim;
-            l.TenPhong = phong!.TenPhong;
-            l.ThoiLuongPhim = phim.ThoiLuong;
+            var capNhat = new LichChieu
+            {
+                MaLichChieu = l.MaLichChieu,
+                MaPhim = maPhim,
+                MaPhong = maPhong,
+                GioBatDau = bd,
+                GioKetThuc = kt,
+                SoVeDaBan = l.SoVeDaBan,
+                TenPhim = phim!.TenPhim,
+                TenPhong = phong!.TenPhong,
+                ThoiLuongPhim = phim.ThoiLuong
+            };
 
-            bool luu = DataManager.Luu();
-            return new KetQua(true, "Showtime updated successfully!" + (luu ? "" : "\n\n(Warning: could not save to disk)"));
+            try
+            {
+                DataManager.Repository.Update(capNhat);
+            }
+            catch (Exception ex)
+            {
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
+            return new KetQua(true, "Showtime updated successfully!");
         }
 
         public static KetQua Xoa(int maLichChieu)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
             if (!CoTheSuaXoa(l, out var lyDo)) return new KetQua(false, "Cannot delete! " + lyDo);
 
-            DataManager.DanhSachLichChieu.Remove(l);
-            bool luu = DataManager.Luu();
-            return new KetQua(true, "Showtime deleted successfully!" + (luu ? "" : "\n\n(Warning: could not save to disk)"));
+            try
+            {
+                DataManager.Repository.Delete(maLichChieu);
+            }
+            catch (Exception ex)
+            {
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
+            return new KetQua(true, "Showtime deleted successfully!");
         }
 
         // =====================================================
@@ -200,25 +248,63 @@ namespace RapPhim.Services
         // otherwise the "locked once tickets are sold" rule can be bypassed.
         // =====================================================
 
+        /// <summary>
+        /// Record ticket sales for a showtime.
+        /// </summary>
+        /// <remarks>
+        /// Chỉ dùng khi chưa có DB vé của Khôi. Khi đã có, trạng thái khóa lấy từ <see cref="IVeDaBanProvider"/>.
+        /// </remarks>
         public static KetQua GhiNhanBanVe(int maLichChieu, int soVe)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
             var phong = DataManager.DanhSachPhongChieu.FirstOrDefault(p => p.MaPhong == l.MaPhong);
             if (phong == null) return new KetQua(false, "Room not found!");
 
             var kq = ApDungBanVe(l, phong.SoGhe, soVe);
-            if (kq.ThanhCong) DataManager.Luu();
+            if (!kq.ThanhCong) return kq;
+
+            try
+            {
+                DataManager.Repository.Update(l);
+            }
+            catch (Exception ex)
+            {
+                DataManager.TaiLai();
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
             return kq;
         }
 
+        /// <summary>
+        /// Cancel previously recorded tickets for a showtime.
+        /// </summary>
+        /// <remarks>
+        /// Chỉ dùng khi chưa có DB vé của Khôi. Khi đã có, trạng thái khóa lấy từ <see cref="IVeDaBanProvider"/>.
+        /// </remarks>
         public static KetQua HuyVe(int maLichChieu, int soVe)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
 
             var kq = ApDungHuyVe(l, soVe);
-            if (kq.ThanhCong) DataManager.Luu();
+            if (!kq.ThanhCong) return kq;
+
+            try
+            {
+                DataManager.Repository.Update(l);
+            }
+            catch (Exception ex)
+            {
+                DataManager.TaiLai();
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
             return kq;
         }
 
@@ -239,12 +325,16 @@ namespace RapPhim.Services
             DateTime min = CatGiay(Now()).AddMinutes(1);
             if (batDau < min) batDau = min;
 
+            // Enforce cinema opening hour (08:00)
+            DateTime moCua = tuLuc.Date.AddHours(GIO_MO_CUA);
+            if (batDau < moCua) batDau = moCua;
+
             // Round up to the next multiple of 5 minutes
             int du = batDau.Minute % 5;
             if (du != 0) batDau = batDau.AddMinutes(5 - du);
 
-            DateTime ngayKeTiep = tuLuc.Date.AddDays(1);
-            for (; batDau < ngayKeTiep; batDau = batDau.AddMinutes(5))
+            DateTime gioiHan = tuLuc.Date.Add(GIO_BAT_DAU_MUON_NHAT);
+            for (; batDau <= gioiHan; batDau = batDau.AddMinutes(5))
             {
                 var ketThuc = batDau.AddMinutes(phim.ThoiLuong);
                 if (TimXungDot(DataManager.DanhSachLichChieu, maPhong, batDau, ketThuc, boQuaMa) == null)
@@ -252,5 +342,124 @@ namespace RapPhim.Services
             }
             return null;
         }
+
+        /// <summary>
+        /// Copy all showtimes starting on <paramref name="tuNgay"/> (optionally for one room) to <paramref name="denNgay"/>.
+        /// Conflicts or past times are recorded in <see cref="KetQuaSaoChep.BoQua"/> without stopping the batch.
+        /// Copied showtimes always start with 0 sold tickets.
+        /// </summary>
+        public static KetQuaSaoChep SaoChepLichNgay(DateTime tuNgay, DateTime denNgay, int? maPhong = null)
+        {
+            var boQua = new List<string>();
+            if (tuNgay.Date == denNgay.Date)
+            {
+                boQua.Add("Source date and target date must be different.");
+                return new KetQuaSaoChep(0, boQua);
+            }
+
+            DataManager.TaiLai();
+            var nguon = DataManager.DanhSachLichChieu
+                .Where(l => l.GioBatDau.Date == tuNgay.Date)
+                .Where(l => !maPhong.HasValue || l.MaPhong == maPhong.Value)
+                .OrderBy(l => l.GioBatDau)
+                .ToList();
+
+            int soTaoMoi = 0;
+            foreach (var l in nguon)
+            {
+                DateTime gioMoi = denNgay.Date.Add(l.GioBatDau.TimeOfDay);
+                var kq = Them(l.MaPhim, l.MaPhong, gioMoi);
+                if (kq.ThanhCong)
+                {
+                    soTaoMoi++;
+                }
+                else
+                {
+                    string lyDo = kq.LichXungDot != null
+                        ? $"Conflicts with {kq.LichXungDot.TenPhim} ({kq.LichXungDot.GioBatDau:HH:mm}-{kq.LichXungDot.GioKetThuc:HH:mm})"
+                        : kq.ThongBao.Split('\n')[0];
+                    boQua.Add($"{l.GioBatDau:HH:mm} {l.TenPhim} @ {l.TenPhong}: {lyDo}");
+                }
+            }
+
+            return new KetQuaSaoChep(soTaoMoi, boQua);
+        }
+
+        // =====================================================
+        // READ API FOR THE TICKET-SALES SCREEN (Sỹ Anh)
+        // =====================================================
+
+        /// <summary>
+        /// Pure overload: showtimes intersecting <paramref name="ngay"/> that have NOT started yet (<c>GioBatDau &gt; now</c>),
+        /// optionally filtered by movie, ordered by start time ascending.
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static List<LichChieu> LaySuatSapChieu(IEnumerable<LichChieu> ds, DateTime ngay, DateTime now, int? maPhim = null)
+        {
+            DateTime dauNgay = ngay.Date;
+            DateTime cuoiNgay = dauNgay.AddDays(1);
+
+            return ds
+                .Where(l => l.GioBatDau < cuoiNgay && l.GioKetThuc > dauNgay)
+                .Where(l => l.GioBatDau > now)
+                .Where(l => !maPhim.HasValue || l.MaPhim == maPhim.Value)
+                .OrderBy(l => l.GioBatDau)
+                .Select(SaoChepLichChieu)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Upcoming showtimes of a day (optionally for one movie), ordered by start time ascending.
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static List<LichChieu> LaySuatSapChieu(DateTime ngay, int? maPhim = null)
+        {
+            DataManager.TaiLai();
+            return LaySuatSapChieu(DataManager.DanhSachLichChieu, ngay, Now(), maPhim);
+        }
+
+        /// <summary>
+        /// Look up a single showtime by id (returns a defensive copy, or null if not found).
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static LichChieu? LayTheoMa(int maLichChieu)
+        {
+            DataManager.TaiLai();
+            var found = DataManager.DanhSachLichChieu.FirstOrDefault(l => l.MaLichChieu == maLichChieu);
+            return found == null ? null : SaoChepLichChieu(found);
+        }
+
+        /// <summary>
+        /// Movies that still have at least one upcoming showtime on <paramref name="ngay"/>.
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static List<Phim> LayPhimCoSuatTrongNgay(DateTime ngay)
+        {
+            var suat = LaySuatSapChieu(ngay);
+            var maPhimSet = suat.Select(s => s.MaPhim).ToHashSet();
+            return DataManager.DanhSachPhim
+                .Where(p => maPhimSet.Contains(p.MaPhim))
+                .Select(p => new Phim
+                {
+                    MaPhim = p.MaPhim,
+                    TenPhim = p.TenPhim,
+                    ThoiLuong = p.ThoiLuong,
+                    TheLoai = p.TheLoai
+                })
+                .ToList();
+        }
+
+        private static LichChieu SaoChepLichChieu(LichChieu s) => new()
+        {
+            MaLichChieu = s.MaLichChieu,
+            MaPhim = s.MaPhim,
+            MaPhong = s.MaPhong,
+            GioBatDau = s.GioBatDau,
+            GioKetThuc = s.GioKetThuc,
+            SoVeDaBan = s.SoVeDaBan,
+            TenPhim = s.TenPhim,
+            TenPhong = s.TenPhong,
+            ThoiLuongPhim = s.ThoiLuongPhim
+        };
     }
 }

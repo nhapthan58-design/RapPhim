@@ -38,6 +38,8 @@ namespace RapPhim
             lblGioKetThucValue = new Label();
             btnGoiYGio = new Button();
             lblTrangThaiSlot = new Label();
+            chkTuNhayGio = new CheckBox();
+            lblThongBao = new Label();
 
             panelButtons = new Panel();
             btnXepLich = new Button();
@@ -83,7 +85,7 @@ namespace RapPhim
             grpThongTin.ForeColor = Color.FromArgb(228, 228, 231);
             grpThongTin.BackColor = Color.FromArgb(27, 27, 31);
             grpThongTin.Location = new Point(20, 75);
-            grpThongTin.Size = new Size(450, 325);
+            grpThongTin.Size = new Size(450, 355);
             grpThongTin.Controls.AddRange(new Control[] {
                 lblPhim, cboPhim,
                 lblPhong, cboPhong,
@@ -91,7 +93,7 @@ namespace RapPhim
                 lblGioChieu, dtpGioChieu,
                 lblThoiLuong, lblThoiLuongValue,
                 lblGioKetThuc, lblGioKetThucValue,
-                btnGoiYGio, lblTrangThaiSlot
+                btnGoiYGio, lblTrangThaiSlot, chkTuNhayGio
             });
 
             // --- Select Movie ---
@@ -172,8 +174,23 @@ namespace RapPhim
             lblTrangThaiSlot.Text = "";
             lblTrangThaiSlot.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
             lblTrangThaiSlot.ForeColor = Color.FromArgb(161, 161, 170);
-            lblTrangThaiSlot.Location = new Point(20, 295);
-            lblTrangThaiSlot.Size = new Size(410, 24);
+            lblTrangThaiSlot.Location = new Point(20, 294);
+            lblTrangThaiSlot.Size = new Size(410, 22);
+
+            // --- Auto-jump checkbox ---
+            chkTuNhayGio.Text = "Auto-jump to next free slot after adding";
+            chkTuNhayGio.Font = new Font("Segoe UI", 9.5F);
+            chkTuNhayGio.ForeColor = Color.FromArgb(228, 228, 231);
+            chkTuNhayGio.Checked = true;
+            chkTuNhayGio.AutoSize = true;
+            chkTuNhayGio.Location = new Point(20, 322);
+
+            // --- Non-blocking status toast ---
+            lblThongBao.Text = "";
+            lblThongBao.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
+            lblThongBao.ForeColor = Color.FromArgb(52, 211, 153);
+            lblThongBao.Location = new Point(20, 496);
+            lblThongBao.Size = new Size(940, 24);
 
             // --- Duration ---
             lblThoiLuong.Text = "Duration:";
@@ -204,7 +221,7 @@ namespace RapPhim
             // =============================================
             // panelButtons - Action Bar
             // =============================================
-            panelButtons.Location = new Point(20, 415);
+            panelButtons.Location = new Point(20, 442);
             panelButtons.Size = new Size(450, 50);
             panelButtons.Controls.AddRange(new Control[] { btnXepLich, btnXoaForm, btnXemDanhSach });
 
@@ -253,13 +270,13 @@ namespace RapPhim
             grpLichPhong.ForeColor = Color.FromArgb(228, 228, 231);
             grpLichPhong.BackColor = Color.FromArgb(27, 27, 31);
             grpLichPhong.Location = new Point(490, 75);
-            grpLichPhong.Size = new Size(470, 390);
+            grpLichPhong.Size = new Size(470, 412);
             grpLichPhong.Controls.Add(dgvLichPhong);
 
             // dgvLichPhong - Modern Dark Table
             dgvLichPhong.Font = new Font("Segoe UI", 9.5F);
             dgvLichPhong.Location = new Point(15, 30);
-            dgvLichPhong.Size = new Size(440, 345);
+            dgvLichPhong.Size = new Size(440, 367);
             dgvLichPhong.ReadOnly = true;
             dgvLichPhong.AllowUserToAddRows = false;
             dgvLichPhong.AllowUserToDeleteRows = false;
@@ -293,12 +310,14 @@ namespace RapPhim
             // =============================================
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(980, 485);
+            ClientSize = new Size(980, 530);
             Controls.Add(panelHeader);
             Controls.Add(panelTopBar);
             Controls.Add(grpThongTin);
             Controls.Add(panelButtons);
             Controls.Add(grpLichPhong);
+            Controls.Add(lblThongBao);
+            AcceptButton = btnXepLich;
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -334,6 +353,8 @@ namespace RapPhim
         private Label lblGioKetThucValue;
         private Button btnGoiYGio;
         private Label lblTrangThaiSlot;
+        private CheckBox chkTuNhayGio;
+        private Label lblThongBao;
 
         private Panel panelButtons;
         private Button btnXepLich;

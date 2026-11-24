@@ -5,6 +5,7 @@ namespace RapPhim.Data
 {
     /// <summary>
     /// Stores showtimes in %AppData%\RapPhim\lichchieu.json (outside the git repo).
+    /// Each CRUD call reads fresh data, mutates a single record, and writes atomically via a temp file.
     /// </summary>
     public class JsonLichChieuRepository : ILichChieuRepository
     {
@@ -44,15 +45,59 @@ namespace RapPhim.Data
             }
         }
 
-        public void SaveAll(IEnumerable<LichChieu> items)
+        public LichChieu Insert(LichChieu item)
+        {
+            var list = LoadAll();
+            int nextId = list.Count == 0 ? 1 : list.Max(x => x.MaLichChieu) + 1;
+
+            var stored = Clone(item, nextId);
+            list.Add(stored);
+            WriteAtomic(list);
+            return Clone(stored, stored.MaLichChieu);
+        }
+
+        public void Update(LichChieu item)
+        {
+            var list = LoadAll();
+            int idx = list.FindIndex(x => x.MaLichChieu == item.MaLichChieu);
+            if (idx < 0)
+                throw new KeyNotFoundException($"Showtime #{item.MaLichChieu} not found.");
+
+            list[idx] = Clone(item, item.MaLichChieu);
+            WriteAtomic(list);
+        }
+
+        public void Delete(int maLichChieu)
+        {
+            var list = LoadAll();
+            int removed = list.RemoveAll(x => x.MaLichChieu == maLichChieu);
+            if (removed > 0)
+            {
+                WriteAtomic(list);
+            }
+        }
+
+        private void WriteAtomic(List<LichChieu> items)
         {
             string? dir = Path.GetDirectoryName(_filePath);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-            // Write to a temp file first, then replace: avoids a half-written file if the app crashes.
             string tmp = _filePath + ".tmp";
             File.WriteAllText(tmp, JsonSerializer.Serialize(items, Options));
             File.Move(tmp, _filePath, overwrite: true);
         }
+
+        private static LichChieu Clone(LichChieu src, int id) => new()
+        {
+            MaLichChieu = id,
+            MaPhim = src.MaPhim,
+            MaPhong = src.MaPhong,
+            GioBatDau = src.GioBatDau,
+            GioKetThuc = src.GioKetThuc,
+            SoVeDaBan = src.SoVeDaBan,
+            TenPhim = src.TenPhim,
+            TenPhong = src.TenPhong,
+            ThoiLuongPhim = src.ThoiLuongPhim
+        };
     }
 }

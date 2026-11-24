@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace RapPhim.Models
 {
     /// <summary>
@@ -27,5 +29,14 @@ namespace RapPhim.Models
         public string Duration { get; set; } = string.Empty;
         public int Tickets { get; set; }
         public string Status { get; set; } = string.Empty;
+
+        [Browsable(false)]
+        public DateTime GioBatDauGoc { get; set; }
+
+        [Browsable(false)]
+        public DateTime GioKetThucGoc { get; set; }
+
+        [Browsable(false)]
+        public int ThoiLuongPhut { get; set; }
     }
 }

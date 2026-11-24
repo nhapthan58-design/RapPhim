@@ -12,20 +12,20 @@ namespace RapPhim.Tests
     public class ServiceIntegrationTests : IDisposable
     {
         private static readonly DateTime FakeNow = new(2030, 1, 15, 8, 0, 0);
-        private readonly List<LichChieu> _backup;
+        private readonly ILichChieuRepository _prevRepo;
+        private readonly InMemoryLichChieuRepository _fakeRepo = new();
 
         public ServiceIntegrationTests()
         {
-            _backup = DataManager.DanhSachLichChieu.ToList();
-            DataManager.DanhSachLichChieu.Clear();
+            _prevRepo = DataManager.Repository;
+            DataManager.DungRepository(_fakeRepo);
             LichChieuService.Now = () => FakeNow;
         }
 
         public void Dispose()
         {
             LichChieuService.Now = () => DateTime.Now;
-            DataManager.DanhSachLichChieu.Clear();
-            DataManager.DanhSachLichChieu.AddRange(_backup);
+            DataManager.DungRepository(_prevRepo);
         }
 
         [Fact]
@@ -104,7 +104,7 @@ namespace RapPhim.Tests
             var l = DataManager.DanhSachLichChieu[0];
             Assert.False(LichChieuService.GhiNhanBanVe(l.MaLichChieu, 41).ThanhCong);
             Assert.True(LichChieuService.GhiNhanBanVe(l.MaLichChieu, 40).ThanhCong);
-            Assert.Equal(40, l.SoVeDaBan);
+            Assert.Equal(40, DataManager.DanhSachLichChieu[0].SoVeDaBan);
         }
 
         [Fact]
@@ -165,20 +165,20 @@ namespace RapPhim.Tests
         }
 
         [Fact]
-        public void SaveThenLoad_RoundTrips()
+        public void InsertThenLoad_RoundTrips()
         {
             var repo = NewRepo();
             var original = new LichChieu
             {
-                MaLichChieu = 7, MaPhim = 2, MaPhong = 3,
+                MaPhim = 2, MaPhong = 3,
                 GioBatDau = new DateTime(2030, 1, 15, 10, 0, 0), GioKetThuc = new DateTime(2030, 1, 15, 12, 12, 0),
                 SoVeDaBan = 12, TenPhim = "Lat Mat 7", TenPhong = "Room 3 - IMAX", ThoiLuongPhim = 132
             };
-            repo.SaveAll(new[] { original });
+            var inserted = repo.Insert(original);
 
             Assert.True(repo.HasData());
             var loaded = Assert.Single(repo.LoadAll());
-            Assert.Equal(original.MaLichChieu, loaded.MaLichChieu);
+            Assert.Equal(inserted.MaLichChieu, loaded.MaLichChieu);
             Assert.Equal(original.GioBatDau, loaded.GioBatDau);
             Assert.Equal(original.GioKetThuc, loaded.GioKetThuc);
             Assert.Equal(original.SoVeDaBan, loaded.SoVeDaBan);
@@ -249,6 +249,49 @@ namespace RapPhim.Tests
 
             Assert.False(string.IsNullOrEmpty(lblSlot.Text));
             f.Close();
+        });
+
+        [Fact]
+        public void ScheduleForm_QuickEntry_AddsShowtimeWithoutModalAndAutoJumps() => RunSta(() =>
+        {
+            var prevRepo = DataManager.Repository;
+            var prevNow = LichChieuService.Now;
+            var fakeNow = new DateTime(2030, 1, 15, 8, 0, 0);
+            try
+            {
+                LichChieuService.Now = () => fakeNow;
+                DataManager.DungRepository(new InMemoryLichChieuRepository());
+
+                using var f = new FormXepLich();
+                f.Show();
+
+                var dtpNgay = Ctl<DateTimePicker>(f, "dtpNgayChieu");
+                var dtpGio = Ctl<DateTimePicker>(f, "dtpGioChieu");
+                var chkAuto = Ctl<CheckBox>(f, "chkTuNhayGio");
+                var btnSchedule = Ctl<Button>(f, "btnXepLich");
+                var dgv = Ctl<DataGridView>(f, "dgvLichPhong");
+                var lblToast = Ctl<Label>(f, "lblThongBao");
+
+                dtpNgay.MinDate = DateTimePicker.MinimumDateTime;
+                dtpNgay.Value = fakeNow.Date;
+                dtpGio.Value = fakeNow.Date.AddHours(9);
+                chkAuto.Checked = true;
+
+                int beforeRows = dgv.Rows.Count;
+                btnSchedule.PerformClick();
+
+                Assert.Equal(beforeRows + 1, dgv.Rows.Count);
+                Assert.Contains("Added:", lblToast.Text);
+                // Movie 1 = 181 min (09:00 -> 12:01) + 15 min buffer = 12:16 -> rounded to 12:20
+                Assert.True(dtpGio.Value.TimeOfDay >= new TimeSpan(12, 16, 0),
+                    $"Expected auto-jump >= 12:16, got {dtpGio.Value:HH:mm}");
+                f.Close();
+            }
+            finally
+            {
+                LichChieuService.Now = prevNow;
+                DataManager.DungRepository(prevRepo);
+            }
         });
 
         [Fact]
