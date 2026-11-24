@@ -5,20 +5,29 @@ namespace RapPhim.Data
 {
     /// <summary>
     /// Central data holder — movies, rooms, and showtimes.
-    /// Showtimes are persisted through <see cref="Repository"/> (JSON file by default).
+    /// Showtimes are persisted per-record through <see cref="Repository"/> configured in <see cref="CauHinhLuuTru"/>.
     /// Scheduling rules live in <see cref="LichChieuService"/>; the public methods below are thin
     /// wrappers kept for backward compatibility.
     /// </summary>
     public static class DataManager
     {
-        private static int _nextLichChieuId = 1;
+        private static ILichChieuRepository? _repo;
+        private static readonly List<LichChieu> _danhSachLichChieu = new();
+        private static bool _daTaiLichChieu = false;
+        private static bool _choPhepTaoMau = true;
 
-        /// <summary>Storage backend. Replace with a SQL implementation of ILichChieuRepository later.</summary>
-        public static ILichChieuRepository Repository { get; set; } = new JsonLichChieuRepository();
+        /// <summary>Active storage backend (lazy-initialized via <see cref="CauHinhLuuTru"/>).</summary>
+        public static ILichChieuRepository Repository => _repo ??= CauHinhLuuTru.TaoRepository();
 
-        static DataManager()
+        /// <summary>
+        /// Swap the active repository (for tests or custom configuration) and reset the in-memory cache.
+        /// </summary>
+        public static void DungRepository(ILichChieuRepository repo, bool choPhepTaoMau = false)
         {
-            KhoiTaoLichChieu();
+            _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+            _danhSachLichChieu.Clear();
+            _daTaiLichChieu = false;
+            _choPhepTaoMau = choPhepTaoMau;
         }
 
         // ===== SAMPLE MOVIES =====
@@ -44,61 +53,56 @@ namespace RapPhim.Data
             new PhongChieu { MaPhong = 5, TenPhong = "Room 5 - 2D", SoGhe = 100 }
         };
 
-        // ===== SCHEDULE LIST =====
-        public static List<LichChieu> DanhSachLichChieu { get; } = new List<LichChieu>();
-
-        // =====================================================
-        // PERSISTENCE
-        // =====================================================
-
-        private static void KhoiTaoLichChieu()
+        // ===== SCHEDULE LIST (lazy-loaded cache) =====
+        public static List<LichChieu> DanhSachLichChieu
         {
+            get
+            {
+                if (!_daTaiLichChieu) TaiLai();
+                return _danhSachLichChieu;
+            }
+        }
+
+        // =====================================================
+        // RELOAD & SYNC
+        // =====================================================
+
+        /// <summary>Reload showtimes fresh from the repository and synchronize movie/room names.</summary>
+        public static void TaiLai()
+        {
+            var repo = Repository;
+            if (!_daTaiLichChieu && _choPhepTaoMau && !repo.HasData())
+            {
+                _daTaiLichChieu = true;
+                TaoDuLieuMau();
+                return;
+            }
+
+            List<LichChieu> loaded;
             try
             {
-                if (Repository.HasData())
-                {
-                    DanhSachLichChieu.Clear();
-                    DanhSachLichChieu.AddRange(Repository.LoadAll());
-                    DongBoTenTuPhimPhong();
-                    _nextLichChieuId = DanhSachLichChieu.Count == 0 ? 1 : DanhSachLichChieu.Max(l => l.MaLichChieu) + 1;
-                    return;
-                }
+                loaded = repo.LoadAll();
             }
             catch (Exception)
             {
-                // Unreadable store: fall back to sample data below.
+                loaded = new List<LichChieu>();
             }
 
-            TaoDuLieuMau();
-            Luu();
+            _danhSachLichChieu.Clear();
+            _danhSachLichChieu.AddRange(loaded);
+            DongBoTenTuPhimPhong();
+            _daTaiLichChieu = true;
         }
 
         /// <summary>Refresh the cached movie/room names in loaded showtimes (they may have been renamed).</summary>
         private static void DongBoTenTuPhimPhong()
         {
-            foreach (var l in DanhSachLichChieu)
+            foreach (var l in _danhSachLichChieu)
             {
                 var phim = DanhSachPhim.FirstOrDefault(p => p.MaPhim == l.MaPhim);
                 var phong = DanhSachPhongChieu.FirstOrDefault(p => p.MaPhong == l.MaPhong);
                 if (phim != null) l.TenPhim = phim.TenPhim;
                 if (phong != null) l.TenPhong = phong.TenPhong;
-            }
-        }
-
-        /// <summary>Next free showtime id.</summary>
-        public static int CapPhatMa() => _nextLichChieuId++;
-
-        /// <summary>Save showtimes to the repository. Returns false if saving failed (app keeps working).</summary>
-        public static bool Luu()
-        {
-            try
-            {
-                Repository.SaveAll(DanhSachLichChieu);
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
             }
         }
 
@@ -132,40 +136,53 @@ namespace RapPhim.Data
         // =====================================================
 
         /// <summary>
-        /// Create sample showtimes for tomorrow (so they are editable in a demo).
+        /// Seed 5 sample showtimes for tomorrow through <see cref="Repository"/>.
         /// Bypasses the "not in the past" rule on purpose.
         /// </summary>
         public static void TaoDuLieuMau()
         {
-            if (DanhSachLichChieu.Count > 0) return;
-
-            var ngay = DateTime.Today.AddDays(1);
-            (int phim, int phong, int gio)[] mau =
+            if (Repository.HasData())
             {
-                (1, 1, 9), (2, 1, 13), (3, 2, 10), (4, 3, 14), (5, 2, 15)
-            };
-
-            foreach (var (maPhim, maPhong, gio) in mau)
-            {
-                var phim = DanhSachPhim.First(p => p.MaPhim == maPhim);
-                var phong = DanhSachPhongChieu.First(p => p.MaPhong == maPhong);
-                var bd = ngay.AddHours(gio);
-                DanhSachLichChieu.Add(new LichChieu
-                {
-                    MaLichChieu = _nextLichChieuId++,
-                    MaPhim = maPhim,
-                    MaPhong = maPhong,
-                    GioBatDau = bd,
-                    GioKetThuc = bd.AddMinutes(phim.ThoiLuong),
-                    SoVeDaBan = 0,
-                    TenPhim = phim.TenPhim,
-                    TenPhong = phong.TenPhong,
-                    ThoiLuongPhim = phim.ThoiLuong
-                });
+                TaiLai();
+                return;
             }
 
-            // One showtime already has tickets sold (locked: cannot edit/delete)
-            DanhSachLichChieu[0].SoVeDaBan = 25;
+            var ngay = DateTime.Today.AddDays(1);
+            (int phim, int phong, int gio, int ve)[] mau =
+            {
+                (1, 1, 9, 25),   // One showtime already has tickets sold (locked: cannot edit/delete)
+                (2, 1, 13, 0),
+                (3, 2, 10, 0),
+                (4, 3, 14, 0),
+                (5, 2, 15, 0)
+            };
+
+            try
+            {
+                foreach (var (maPhim, maPhong, gio, ve) in mau)
+                {
+                    var phim = DanhSachPhim.First(p => p.MaPhim == maPhim);
+                    var phong = DanhSachPhongChieu.First(p => p.MaPhong == maPhong);
+                    var bd = ngay.AddHours(gio);
+                    Repository.Insert(new LichChieu
+                    {
+                        MaPhim = maPhim,
+                        MaPhong = maPhong,
+                        GioBatDau = bd,
+                        GioKetThuc = bd.AddMinutes(phim.ThoiLuong),
+                        SoVeDaBan = ve,
+                        TenPhim = phim.TenPhim,
+                        TenPhong = phong.TenPhong,
+                        ThoiLuongPhim = phim.ThoiLuong
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore seed error on read-only storage
+            }
+
+            TaiLai();
         }
     }
 }

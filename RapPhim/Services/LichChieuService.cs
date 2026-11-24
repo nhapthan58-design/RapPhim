@@ -124,6 +124,7 @@ namespace RapPhim.Services
 
         public static KetQua Them(int maPhim, int maPhong, DateTime batDau)
         {
+            DataManager.TaiLai();
             var v = Validate(maPhim, maPhong, batDau, -1, out var phim, out var phong, out var bd, out var kt);
             if (!v.ThanhCong)
             {
@@ -143,7 +144,6 @@ namespace RapPhim.Services
 
             var moi = new LichChieu
             {
-                MaLichChieu = DataManager.CapPhatMa(),
                 MaPhim = maPhim,
                 MaPhong = maPhong,
                 GioBatDau = bd,
@@ -153,16 +153,25 @@ namespace RapPhim.Services
                 TenPhong = phong!.TenPhong,
                 ThoiLuongPhim = phim.ThoiLuong
             };
-            DataManager.DanhSachLichChieu.Add(moi);
-            bool luu = DataManager.Luu();
 
+            try
+            {
+                DataManager.Repository.Insert(moi);
+            }
+            catch (Exception ex)
+            {
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
             return new KetQua(true,
                 $"Showtime scheduled successfully!\n\nMovie: {phim.TenPhim}\nRoom: {phong.TenPhong}\n" +
-                $"Time: {bd:HH:mm} - {kt:HH:mm dd/MM/yyyy}" + (luu ? "" : "\n\n(Warning: could not save to disk)"));
+                $"Time: {bd:HH:mm} - {kt:HH:mm dd/MM/yyyy}");
         }
 
         public static KetQua CapNhat(int maLichChieu, int maPhim, int maPhong, DateTime batDau)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
             if (!CoTheSuaXoa(l, out var lyDo)) return new KetQua(false, "Cannot edit! " + lyDo);
@@ -171,27 +180,50 @@ namespace RapPhim.Services
             if (!v.ThanhCong)
                 return v.LichXungDot != null ? new KetQua(false, "TIME CONFLICT: " + v.ThongBao, v.LichXungDot) : v;
 
-            l.MaPhim = maPhim;
-            l.MaPhong = maPhong;
-            l.GioBatDau = bd;
-            l.GioKetThuc = kt;
-            l.TenPhim = phim!.TenPhim;
-            l.TenPhong = phong!.TenPhong;
-            l.ThoiLuongPhim = phim.ThoiLuong;
+            var capNhat = new LichChieu
+            {
+                MaLichChieu = l.MaLichChieu,
+                MaPhim = maPhim,
+                MaPhong = maPhong,
+                GioBatDau = bd,
+                GioKetThuc = kt,
+                SoVeDaBan = l.SoVeDaBan,
+                TenPhim = phim!.TenPhim,
+                TenPhong = phong!.TenPhong,
+                ThoiLuongPhim = phim.ThoiLuong
+            };
 
-            bool luu = DataManager.Luu();
-            return new KetQua(true, "Showtime updated successfully!" + (luu ? "" : "\n\n(Warning: could not save to disk)"));
+            try
+            {
+                DataManager.Repository.Update(capNhat);
+            }
+            catch (Exception ex)
+            {
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
+            return new KetQua(true, "Showtime updated successfully!");
         }
 
         public static KetQua Xoa(int maLichChieu)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
             if (!CoTheSuaXoa(l, out var lyDo)) return new KetQua(false, "Cannot delete! " + lyDo);
 
-            DataManager.DanhSachLichChieu.Remove(l);
-            bool luu = DataManager.Luu();
-            return new KetQua(true, "Showtime deleted successfully!" + (luu ? "" : "\n\n(Warning: could not save to disk)"));
+            try
+            {
+                DataManager.Repository.Delete(maLichChieu);
+            }
+            catch (Exception ex)
+            {
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
+            return new KetQua(true, "Showtime deleted successfully!");
         }
 
         // =====================================================
@@ -202,23 +234,49 @@ namespace RapPhim.Services
 
         public static KetQua GhiNhanBanVe(int maLichChieu, int soVe)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
             var phong = DataManager.DanhSachPhongChieu.FirstOrDefault(p => p.MaPhong == l.MaPhong);
             if (phong == null) return new KetQua(false, "Room not found!");
 
             var kq = ApDungBanVe(l, phong.SoGhe, soVe);
-            if (kq.ThanhCong) DataManager.Luu();
+            if (!kq.ThanhCong) return kq;
+
+            try
+            {
+                DataManager.Repository.Update(l);
+            }
+            catch (Exception ex)
+            {
+                DataManager.TaiLai();
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
             return kq;
         }
 
         public static KetQua HuyVe(int maLichChieu, int soVe)
         {
+            DataManager.TaiLai();
             var l = DataManager.DanhSachLichChieu.FirstOrDefault(x => x.MaLichChieu == maLichChieu);
             if (l == null) return new KetQua(false, "Showtime not found!");
 
             var kq = ApDungHuyVe(l, soVe);
-            if (kq.ThanhCong) DataManager.Luu();
+            if (!kq.ThanhCong) return kq;
+
+            try
+            {
+                DataManager.Repository.Update(l);
+            }
+            catch (Exception ex)
+            {
+                DataManager.TaiLai();
+                return new KetQua(false, "Could not save: " + ex.Message);
+            }
+
+            DataManager.TaiLai();
             return kq;
         }
 

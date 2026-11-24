@@ -18,6 +18,7 @@ namespace RapPhim
             chkTatCaNgay.Checked = true;
             dtpLocNgay.Enabled = false;
 
+            DataManager.TaiLai();
             LoadBoLoc();
             LoadDanhSach();
         }
@@ -38,7 +39,11 @@ namespace RapPhim
             dtpLocNgay.Enabled = !chkTatCaNgay.Checked;
         }
 
-        private void btnLoc_Click(object? sender, EventArgs e) => LoadDanhSach();
+        private void btnLoc_Click(object? sender, EventArgs e)
+        {
+            DataManager.TaiLai();
+            LoadDanhSach();
+        }
 
         private void txtTimPhim_TextChanged(object? sender, EventArgs e) => LoadDanhSach();
 

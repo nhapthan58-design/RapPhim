@@ -16,6 +16,7 @@ namespace RapPhim
             dgvLichPhong.CellFormatting += dgvLichPhong_CellFormatting;
 
             _dangTaiDuLieu = true;
+            DataManager.TaiLai();
             dtpGioChieu.Value = LamTronLen5Phut(DateTime.Now.AddMinutes(5));
             LoadDuLieu();
             _dangTaiDuLieu = false;
