@@ -12,6 +12,12 @@ namespace RapPhim.Services
         /// <summary>Gap (minutes) required between two showtimes in the same room for cleaning.</summary>
         public const int BUFFER_PHUT = 15;
 
+        /// <summary>Earliest allowed showtime start hour (08:00).</summary>
+        public const int GIO_MO_CUA = 8;
+
+        /// <summary>Latest allowed showtime start time (23:30). Ending past midnight is permitted.</summary>
+        public static readonly TimeSpan GIO_BAT_DAU_MUON_NHAT = new(23, 30, 0);
+
         /// <summary>Clock used by the service (replaceable in tests).</summary>
         public static Func<DateTime> Now { get; set; } = () => DateTime.Now;
 
@@ -115,6 +121,9 @@ namespace RapPhim.Services
             kt = bd.AddMinutes(phim.ThoiLuong);
 
             if (bd <= Now()) return new KetQua(false, "Cannot schedule a showtime in the past.");
+
+            if (bd.TimeOfDay < TimeSpan.FromHours(GIO_MO_CUA) || bd.TimeOfDay > GIO_BAT_DAU_MUON_NHAT)
+                return new KetQua(false, "Showtime must start between 08:00 and 23:30.");
 
             var xungDot = TimXungDot(DataManager.DanhSachLichChieu, maPhong, bd, kt, boQuaMa);
             if (xungDot != null)
@@ -316,12 +325,16 @@ namespace RapPhim.Services
             DateTime min = CatGiay(Now()).AddMinutes(1);
             if (batDau < min) batDau = min;
 
+            // Enforce cinema opening hour (08:00)
+            DateTime moCua = tuLuc.Date.AddHours(GIO_MO_CUA);
+            if (batDau < moCua) batDau = moCua;
+
             // Round up to the next multiple of 5 minutes
             int du = batDau.Minute % 5;
             if (du != 0) batDau = batDau.AddMinutes(5 - du);
 
-            DateTime ngayKeTiep = tuLuc.Date.AddDays(1);
-            for (; batDau < ngayKeTiep; batDau = batDau.AddMinutes(5))
+            DateTime gioiHan = tuLuc.Date.Add(GIO_BAT_DAU_MUON_NHAT);
+            for (; batDau <= gioiHan; batDau = batDau.AddMinutes(5))
             {
                 var ketThuc = batDau.AddMinutes(phim.ThoiLuong);
                 if (TimXungDot(DataManager.DanhSachLichChieu, maPhong, batDau, ketThuc, boQuaMa) == null)

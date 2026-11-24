@@ -26,7 +26,7 @@ namespace RapPhim
 
             _dangTaiDuLieu = true;
             DataManager.TaiLai();
-            dtpGioChieu.Value = LamTronLen5Phut(LichChieuService.Now().AddMinutes(5));
+            DatGioMacDinhHopLe();
             LoadDuLieu();
             _dangTaiDuLieu = false;
 
@@ -93,6 +93,24 @@ namespace RapPhim
             d = LichChieuService.CatGiay(d);
             int du = d.Minute % 5;
             return du == 0 ? d : d.AddMinutes(5 - du);
+        }
+
+        /// <summary>Default add-mode date &amp; time snapped inside cinema operating hours [08:00, 23:30].</summary>
+        private void DatGioMacDinhHopLe()
+        {
+            DateTime macDinh = LamTronLen5Phut(LichChieuService.Now().AddMinutes(5));
+            if (macDinh.TimeOfDay < TimeSpan.FromHours(LichChieuService.GIO_MO_CUA))
+            {
+                macDinh = macDinh.Date.AddHours(LichChieuService.GIO_MO_CUA);
+            }
+            else if (macDinh.TimeOfDay > LichChieuService.GIO_BAT_DAU_MUON_NHAT)
+            {
+                macDinh = macDinh.Date.AddDays(1).AddHours(LichChieuService.GIO_MO_CUA);
+            }
+
+            if (macDinh.Date < dtpNgayChieu.MinDate) dtpNgayChieu.MinDate = macDinh.Date;
+            dtpNgayChieu.Value = macDinh.Date;
+            dtpGioChieu.Value = macDinh;
         }
 
         private DateTime LayGioBatDau()
@@ -315,8 +333,7 @@ namespace RapPhim
             {
                 if (cboPhim.Items.Count > 0) cboPhim.SelectedIndex = 0;
                 if (cboPhong.Items.Count > 0) cboPhong.SelectedIndex = 0;
-                dtpNgayChieu.Value = DateTime.Today;
-                dtpGioChieu.Value = LamTronLen5Phut(LichChieuService.Now().AddMinutes(5));
+                DatGioMacDinhHopLe();
             }
             _dangTaiDuLieu = false;
             LamMoiTatCa();
