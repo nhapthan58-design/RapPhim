@@ -329,5 +329,82 @@ namespace RapPhim.Services
             }
             return null;
         }
+
+        // =====================================================
+        // READ API FOR THE TICKET-SALES SCREEN (Sỹ Anh)
+        // =====================================================
+
+        /// <summary>
+        /// Pure overload: showtimes intersecting <paramref name="ngay"/> that have NOT started yet (<c>GioBatDau &gt; now</c>),
+        /// optionally filtered by movie, ordered by start time ascending.
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static List<LichChieu> LaySuatSapChieu(IEnumerable<LichChieu> ds, DateTime ngay, DateTime now, int? maPhim = null)
+        {
+            DateTime dauNgay = ngay.Date;
+            DateTime cuoiNgay = dauNgay.AddDays(1);
+
+            return ds
+                .Where(l => l.GioBatDau < cuoiNgay && l.GioKetThuc > dauNgay)
+                .Where(l => l.GioBatDau > now)
+                .Where(l => !maPhim.HasValue || l.MaPhim == maPhim.Value)
+                .OrderBy(l => l.GioBatDau)
+                .Select(SaoChepLichChieu)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Upcoming showtimes of a day (optionally for one movie), ordered by start time ascending.
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static List<LichChieu> LaySuatSapChieu(DateTime ngay, int? maPhim = null)
+        {
+            DataManager.TaiLai();
+            return LaySuatSapChieu(DataManager.DanhSachLichChieu, ngay, Now(), maPhim);
+        }
+
+        /// <summary>
+        /// Look up a single showtime by id (returns a defensive copy, or null if not found).
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static LichChieu? LayTheoMa(int maLichChieu)
+        {
+            DataManager.TaiLai();
+            var found = DataManager.DanhSachLichChieu.FirstOrDefault(l => l.MaLichChieu == maLichChieu);
+            return found == null ? null : SaoChepLichChieu(found);
+        }
+
+        /// <summary>
+        /// Movies that still have at least one upcoming showtime on <paramref name="ngay"/>.
+        /// Dành cho màn hình Bán vé. Không sửa trực tiếp object trả về.
+        /// </summary>
+        public static List<Phim> LayPhimCoSuatTrongNgay(DateTime ngay)
+        {
+            var suat = LaySuatSapChieu(ngay);
+            var maPhimSet = suat.Select(s => s.MaPhim).ToHashSet();
+            return DataManager.DanhSachPhim
+                .Where(p => maPhimSet.Contains(p.MaPhim))
+                .Select(p => new Phim
+                {
+                    MaPhim = p.MaPhim,
+                    TenPhim = p.TenPhim,
+                    ThoiLuong = p.ThoiLuong,
+                    TheLoai = p.TheLoai
+                })
+                .ToList();
+        }
+
+        private static LichChieu SaoChepLichChieu(LichChieu s) => new()
+        {
+            MaLichChieu = s.MaLichChieu,
+            MaPhim = s.MaPhim,
+            MaPhong = s.MaPhong,
+            GioBatDau = s.GioBatDau,
+            GioKetThuc = s.GioKetThuc,
+            SoVeDaBan = s.SoVeDaBan,
+            TenPhim = s.TenPhim,
+            TenPhong = s.TenPhong,
+            ThoiLuongPhim = s.ThoiLuongPhim
+        };
     }
 }
