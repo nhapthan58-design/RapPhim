@@ -29,6 +29,7 @@ namespace RapPhim
             lblLocNgay = new Label();
             dtpLocNgay = new DateTimePicker();
             chkTatCaNgay = new CheckBox();
+            chkAnDaChieu = new CheckBox();
             btnLoc = new Button();
             txtTimPhim = new TextBox();
             lblLyDoKhoa = new Label();
@@ -76,60 +77,68 @@ namespace RapPhim
             panelFilter.Location = new Point(0, 58);
             panelFilter.Size = new Size(1060, 52);
             panelFilter.Controls.AddRange(new Control[] {
-                lblLocPhong, cboLocPhong, lblLocNgay, dtpLocNgay, chkTatCaNgay, btnLoc, txtTimPhim
+                lblLocPhong, cboLocPhong, lblLocNgay, dtpLocNgay, chkTatCaNgay, chkAnDaChieu, btnLoc, txtTimPhim
             });
 
             lblLocPhong.Text = "Room:";
             lblLocPhong.Font = new Font("Segoe UI", 9.5F);
             lblLocPhong.ForeColor = Color.FromArgb(161, 161, 170);
-            lblLocPhong.Location = new Point(20, 15);
+            lblLocPhong.Location = new Point(15, 15);
             lblLocPhong.AutoSize = true;
 
-            cboLocPhong.Font = new Font("Segoe UI", 10F);
+            cboLocPhong.Font = new Font("Segoe UI", 9.5F);
             cboLocPhong.DropDownStyle = ComboBoxStyle.DropDownList;
             cboLocPhong.BackColor = Color.FromArgb(18, 18, 20);
             cboLocPhong.ForeColor = Color.FromArgb(244, 244, 245);
             cboLocPhong.FlatStyle = FlatStyle.Flat;
-            cboLocPhong.Location = new Point(75, 12);
-            cboLocPhong.Size = new Size(210, 30);
+            cboLocPhong.Location = new Point(65, 12);
+            cboLocPhong.Size = new Size(165, 28);
 
             lblLocNgay.Text = "Date:";
             lblLocNgay.Font = new Font("Segoe UI", 9.5F);
             lblLocNgay.ForeColor = Color.FromArgb(161, 161, 170);
-            lblLocNgay.Location = new Point(310, 15);
+            lblLocNgay.Location = new Point(242, 15);
             lblLocNgay.AutoSize = true;
 
-            dtpLocNgay.Font = new Font("Segoe UI", 10F);
+            dtpLocNgay.Font = new Font("Segoe UI", 9.5F);
             dtpLocNgay.Format = DateTimePickerFormat.Short;
-            dtpLocNgay.Location = new Point(355, 12);
-            dtpLocNgay.Size = new Size(150, 30);
+            dtpLocNgay.Location = new Point(285, 12);
+            dtpLocNgay.Size = new Size(125, 28);
 
             chkTatCaNgay.Text = "All dates";
             chkTatCaNgay.Font = new Font("Segoe UI", 9.5F);
             chkTatCaNgay.ForeColor = Color.FromArgb(228, 228, 231);
-            chkTatCaNgay.Location = new Point(530, 14);
+            chkTatCaNgay.Location = new Point(422, 14);
             chkTatCaNgay.AutoSize = true;
             chkTatCaNgay.CheckedChanged += chkTatCaNgay_CheckedChanged;
 
-            btnLoc.Text = "🔍  Filter";
-            btnLoc.Font = new Font("Segoe UI Bold", 10F, FontStyle.Bold);
+            chkAnDaChieu.Text = "Hide ended";
+            chkAnDaChieu.Font = new Font("Segoe UI", 9.5F);
+            chkAnDaChieu.ForeColor = Color.FromArgb(228, 228, 231);
+            chkAnDaChieu.Checked = true;
+            chkAnDaChieu.Location = new Point(512, 14);
+            chkAnDaChieu.AutoSize = true;
+            chkAnDaChieu.CheckedChanged += chkAnDaChieu_CheckedChanged;
+
+            btnLoc.Text = "🔍 Filter";
+            btnLoc.Font = new Font("Segoe UI Bold", 9.5F, FontStyle.Bold);
             btnLoc.BackColor = Color.FromArgb(225, 29, 72); // Cinema Crimson Red
             btnLoc.ForeColor = Color.White;
             btnLoc.FlatStyle = FlatStyle.Flat;
             btnLoc.FlatAppearance.BorderSize = 0;
-            btnLoc.Location = new Point(660, 9);
-            btnLoc.Size = new Size(100, 34);
+            btnLoc.Location = new Point(622, 9);
+            btnLoc.Size = new Size(88, 34);
             btnLoc.Cursor = Cursors.Hand;
             btnLoc.Click += btnLoc_Click;
 
             // txtTimPhim - live movie search
-            txtTimPhim.Font = new Font("Segoe UI", 10F);
+            txtTimPhim.Font = new Font("Segoe UI", 9.5F);
             txtTimPhim.PlaceholderText = "Search movie...";
             txtTimPhim.BackColor = Color.FromArgb(18, 18, 20);
             txtTimPhim.ForeColor = Color.FromArgb(244, 244, 245);
             txtTimPhim.BorderStyle = BorderStyle.FixedSingle;
-            txtTimPhim.Location = new Point(780, 12);
-            txtTimPhim.Size = new Size(250, 30);
+            txtTimPhim.Location = new Point(722, 12);
+            txtTimPhim.Size = new Size(205, 28);
             txtTimPhim.TextChanged += txtTimPhim_TextChanged;
 
             // =============================================
@@ -172,6 +181,7 @@ namespace RapPhim
             dgvDanhSach.SelectionChanged += dgvDanhSach_SelectionChanged;
             dgvDanhSach.CellDoubleClick += dgvDanhSach_CellDoubleClick;
             dgvDanhSach.KeyDown += dgvDanhSach_KeyDown;
+            dgvDanhSach.ColumnHeaderMouseClick += dgvDanhSach_ColumnHeaderMouseClick;
 
             // =============================================
             // panelBottom - Footer Action Bar
@@ -182,10 +192,10 @@ namespace RapPhim
             panelBottom.Controls.AddRange(new Control[] { lblTongSuat, lblLyDoKhoa, btnSaoChep, btnSua, btnXoa, btnDong });
 
             lblLyDoKhoa.Text = "";
-            lblLyDoKhoa.Font = new Font("Segoe UI", 9.5F, FontStyle.Italic);
+            lblLyDoKhoa.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
             lblLyDoKhoa.ForeColor = Color.FromArgb(251, 191, 36);
-            lblLyDoKhoa.Location = new Point(230, 21);
-            lblLyDoKhoa.Size = new Size(300, 22);
+            lblLyDoKhoa.Location = new Point(15, 34);
+            lblLyDoKhoa.Size = new Size(510, 20);
 
             // btnSaoChep - Copy Day button
             btnSaoChep.Text = "📑 Copy Day";
@@ -199,10 +209,10 @@ namespace RapPhim
             btnSaoChep.Cursor = Cursors.Hand;
             btnSaoChep.Click += btnSaoChep_Click;
 
-            lblTongSuat.Text = "Total: 0 showtimes";
-            lblTongSuat.Font = new Font("Segoe UI Semibold", 10.5F, FontStyle.Bold);
+            lblTongSuat.Text = "Total: 0";
+            lblTongSuat.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
             lblTongSuat.ForeColor = Color.FromArgb(244, 244, 245);
-            lblTongSuat.Location = new Point(20, 20);
+            lblTongSuat.Location = new Point(15, 10);
             lblTongSuat.AutoSize = true;
 
             // btnSua - Warm Gold / Amber Accent
@@ -279,6 +289,7 @@ namespace RapPhim
         private Label lblLocNgay;
         private DateTimePicker dtpLocNgay;
         private CheckBox chkTatCaNgay;
+        private CheckBox chkAnDaChieu;
         private Button btnLoc;
         private TextBox txtTimPhim;
         private Label lblLyDoKhoa;

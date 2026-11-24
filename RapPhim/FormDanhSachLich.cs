@@ -10,6 +10,9 @@ namespace RapPhim
         private const string TRANG_THAI_KHOA = "Locked";
         private const string TRANG_THAI_DA_CHIEU = "Ended";
 
+        private string _cotSapXep = "Start";
+        private bool _sapXepTang = true;
+
         public FormDanhSachLich()
         {
             InitializeComponent();
@@ -39,6 +42,8 @@ namespace RapPhim
             dtpLocNgay.Enabled = !chkTatCaNgay.Checked;
         }
 
+        private void chkAnDaChieu_CheckedChanged(object? sender, EventArgs e) => LoadDanhSach();
+
         private void btnLoc_Click(object? sender, EventArgs e)
         {
             DataManager.TaiLai();
@@ -52,6 +57,46 @@ namespace RapPhim
             if (l.GioKetThuc <= now) return TRANG_THAI_DA_CHIEU;
             if (!LichChieuService.CoTheSuaXoa(l, now, out _)) return TRANG_THAI_KHOA;
             return TRANG_THAI_CON_TRONG;
+        }
+
+        /// <summary>Sort view models by column name (uses real DateTime / int fields, never formatted strings).</summary>
+        public static List<LichChieuViewModel> SapXepDanhSach(IEnumerable<LichChieuViewModel> items, string colName, bool ascending)
+        {
+            IOrderedEnumerable<LichChieuViewModel> ordered = colName switch
+            {
+                "ID" => ascending ? items.OrderBy(x => x.ID) : items.OrderByDescending(x => x.ID),
+                "Movie" => ascending ? items.OrderBy(x => x.Movie, StringComparer.OrdinalIgnoreCase) : items.OrderByDescending(x => x.Movie, StringComparer.OrdinalIgnoreCase),
+                "Room" => ascending ? items.OrderBy(x => x.Room, StringComparer.OrdinalIgnoreCase) : items.OrderByDescending(x => x.Room, StringComparer.OrdinalIgnoreCase),
+                "Date" => ascending ? items.OrderBy(x => x.GioBatDauGoc) : items.OrderByDescending(x => x.GioBatDauGoc),
+                "Start" => ascending ? items.OrderBy(x => x.GioBatDauGoc) : items.OrderByDescending(x => x.GioBatDauGoc),
+                "End" => ascending ? items.OrderBy(x => x.GioKetThucGoc) : items.OrderByDescending(x => x.GioKetThucGoc),
+                "Duration" => ascending ? items.OrderBy(x => x.ThoiLuongPhut) : items.OrderByDescending(x => x.ThoiLuongPhut),
+                "Tickets" => ascending ? items.OrderBy(x => x.Tickets) : items.OrderByDescending(x => x.Tickets),
+                "Status" => ascending ? items.OrderBy(x => x.Status, StringComparer.OrdinalIgnoreCase) : items.OrderByDescending(x => x.Status, StringComparer.OrdinalIgnoreCase),
+                _ => ascending ? items.OrderBy(x => x.GioBatDauGoc) : items.OrderByDescending(x => x.GioBatDauGoc)
+            };
+            return ordered.ToList();
+        }
+
+        private void dgvDanhSach_ColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.ColumnIndex < 0 || e.ColumnIndex >= dgvDanhSach.Columns.Count) return;
+            string colName = dgvDanhSach.Columns[e.ColumnIndex].Name;
+            SapXepTheoCot(colName);
+        }
+
+        public void SapXepTheoCot(string colName)
+        {
+            if (_cotSapXep == colName)
+            {
+                _sapXepTang = !_sapXepTang;
+            }
+            else
+            {
+                _cotSapXep = colName;
+                _sapXepTang = true;
+            }
+            LoadDanhSach();
         }
 
         private void LoadDanhSach()
@@ -75,7 +120,9 @@ namespace RapPhim
             if (!chkTatCaNgay.Checked)
             {
                 DateTime ngayLoc = dtpLocNgay.Value.Date;
-                query = query.Where(l => l.GioBatDau.Date == ngayLoc);
+                DateTime ngayKeTiep = ngayLoc.AddDays(1);
+                // Interval intersection catches overnight showtimes spanning midnight.
+                query = query.Where(l => l.GioBatDau < ngayKeTiep && l.GioKetThuc > ngayLoc);
             }
 
             string tuKhoa = txtTimPhim.Text.Trim();
@@ -85,8 +132,7 @@ namespace RapPhim
             }
 
             DateTime now = LichChieuService.Now();
-            var danhSach = query
-                .OrderBy(l => l.GioBatDau)
+            var tatCaTruocKhiAn = query
                 .Select(l => new LichChieuViewModel
                 {
                     ID = l.MaLichChieu,
@@ -96,13 +142,37 @@ namespace RapPhim
                     Start = l.GioBatDau.ToString("HH:mm"),
                     End = l.GioKetThuc.ToString("HH:mm"),
                     Duration = $"{l.ThoiLuongPhim} min",
-                    Tickets = l.SoVeDaBan,
-                    Status = TinhTrangThai(l, now)
+                    Tickets = DataManager.VeDaBanProvider.DemVeDaBan(l.MaLichChieu),
+                    Status = TinhTrangThai(l, now),
+                    GioBatDauGoc = l.GioBatDau,
+                    GioKetThucGoc = l.GioKetThuc,
+                    ThoiLuongPhut = l.ThoiLuongPhim
                 })
                 .ToList();
 
+            // Count statuses BEFORE hiding Ended so the footer always reflects full totals.
+            int tong = tatCaTruocKhiAn.Count;
+            int conTrong = tatCaTruocKhiAn.Count(x => x.Status == TRANG_THAI_CON_TRONG);
+            int khoa = tatCaTruocKhiAn.Count(x => x.Status == TRANG_THAI_KHOA);
+            int daChieu = tatCaTruocKhiAn.Count(x => x.Status == TRANG_THAI_DA_CHIEU);
+
+            IEnumerable<LichChieuViewModel> hienThi = chkAnDaChieu.Checked
+                ? tatCaTruocKhiAn.Where(x => x.Status != TRANG_THAI_DA_CHIEU)
+                : tatCaTruocKhiAn;
+
+            var danhSach = SapXepDanhSach(hienThi, _cotSapXep, _sapXepTang);
+
             dgvDanhSach.DataSource = null;
             dgvDanhSach.DataSource = danhSach;
+
+            // Show sort glyph on active column header.
+            foreach (DataGridViewColumn col in dgvDanhSach.Columns)
+            {
+                col.SortMode = DataGridViewColumnSortMode.Programmatic;
+                col.HeaderCell.SortGlyphDirection = col.Name == _cotSapXep
+                    ? (_sapXepTang ? SortOrder.Ascending : SortOrder.Descending)
+                    : SortOrder.None;
+            }
 
             // Restore the selection (same item, otherwise the neighbouring row).
             if (danhSach.Count > 0)
@@ -117,7 +187,7 @@ namespace RapPhim
                 }
             }
 
-            lblTongSuat.Text = $"Total: {danhSach.Count} showtimes";
+            lblTongSuat.Text = $"Total: {tong} · Available: {conTrong} · Locked: {khoa} · Ended: {daChieu}";
             CapNhatNutTheoDongChon();
         }
 
