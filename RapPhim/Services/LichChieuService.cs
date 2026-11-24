@@ -38,10 +38,10 @@ namespace RapPhim.Services
             return null;
         }
 
-        /// <summary>A showtime is locked once tickets are sold or it has already started.</summary>
-        public static bool CoTheSuaXoa(LichChieu l, DateTime now, out string lyDo)
+        /// <summary>Pure lock check: a showtime is locked once tickets are sold or it has already started.</summary>
+        public static bool CoTheSuaXoa(LichChieu l, DateTime now, int soVeDaBan, out string lyDo)
         {
-            if (l.SoVeDaBan > 0)
+            if (soVeDaBan > 0)
             {
                 lyDo = "Tickets already sold for this showtime.";
                 return false;
@@ -53,6 +53,13 @@ namespace RapPhim.Services
             }
             lyDo = string.Empty;
             return true;
+        }
+
+        /// <summary>Lock check using <see cref="DataManager.VeDaBanProvider"/> for sold ticket count.</summary>
+        public static bool CoTheSuaXoa(LichChieu l, DateTime now, out string lyDo)
+        {
+            int soVe = DataManager.VeDaBanProvider.DemVeDaBan(l.MaLichChieu);
+            return CoTheSuaXoa(l, now, soVe, out lyDo);
         }
 
         public static bool CoTheSuaXoa(LichChieu l, out string lyDo) => CoTheSuaXoa(l, Now(), out lyDo);
@@ -232,6 +239,12 @@ namespace RapPhim.Services
         // otherwise the "locked once tickets are sold" rule can be bypassed.
         // =====================================================
 
+        /// <summary>
+        /// Record ticket sales for a showtime.
+        /// </summary>
+        /// <remarks>
+        /// Chỉ dùng khi chưa có DB vé của Khôi. Khi đã có, trạng thái khóa lấy từ <see cref="IVeDaBanProvider"/>.
+        /// </remarks>
         public static KetQua GhiNhanBanVe(int maLichChieu, int soVe)
         {
             DataManager.TaiLai();
@@ -257,6 +270,12 @@ namespace RapPhim.Services
             return kq;
         }
 
+        /// <summary>
+        /// Cancel previously recorded tickets for a showtime.
+        /// </summary>
+        /// <remarks>
+        /// Chỉ dùng khi chưa có DB vé của Khôi. Khi đã có, trạng thái khóa lấy từ <see cref="IVeDaBanProvider"/>.
+        /// </remarks>
         public static KetQua HuyVe(int maLichChieu, int soVe)
         {
             DataManager.TaiLai();

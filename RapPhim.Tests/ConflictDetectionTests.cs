@@ -80,24 +80,32 @@ namespace RapPhim.Tests
         [Fact]
         public void FutureAndNoTickets_CanEdit()
         {
-            Assert.True(LichChieuService.CoTheSuaXoa(L(Now.AddHours(3), 0), Now, out var lyDo));
+            var l = L(Now.AddHours(3), 0);
+            Assert.True(LichChieuService.CoTheSuaXoa(l, Now, l.SoVeDaBan, out var lyDo));
             Assert.Equal(string.Empty, lyDo);
         }
 
         [Fact]
         public void HasTickets_Locked()
         {
-            Assert.False(LichChieuService.CoTheSuaXoa(L(Now.AddHours(3), 1), Now, out var lyDo));
+            var l = L(Now.AddHours(3), 1);
+            Assert.False(LichChieuService.CoTheSuaXoa(l, Now, l.SoVeDaBan, out var lyDo));
             Assert.Contains("sold", lyDo, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
-        public void AlreadyStarted_Locked() =>
-            Assert.False(LichChieuService.CoTheSuaXoa(L(Now.AddMinutes(-1), 0), Now, out _));
+        public void AlreadyStarted_Locked()
+        {
+            var l = L(Now.AddMinutes(-1), 0);
+            Assert.False(LichChieuService.CoTheSuaXoa(l, Now, l.SoVeDaBan, out _));
+        }
 
         [Fact]
-        public void StartsExactlyNow_Locked() =>
-            Assert.False(LichChieuService.CoTheSuaXoa(L(Now, 0), Now, out _));
+        public void StartsExactlyNow_Locked()
+        {
+            var l = L(Now, 0);
+            Assert.False(LichChieuService.CoTheSuaXoa(l, Now, l.SoVeDaBan, out _));
+        }
     }
 
     public class TicketRuleTests
