@@ -252,6 +252,49 @@ namespace RapPhim.Tests
         });
 
         [Fact]
+        public void ScheduleForm_QuickEntry_AddsShowtimeWithoutModalAndAutoJumps() => RunSta(() =>
+        {
+            var prevRepo = DataManager.Repository;
+            var prevNow = LichChieuService.Now;
+            var fakeNow = new DateTime(2030, 1, 15, 8, 0, 0);
+            try
+            {
+                LichChieuService.Now = () => fakeNow;
+                DataManager.DungRepository(new InMemoryLichChieuRepository());
+
+                using var f = new FormXepLich();
+                f.Show();
+
+                var dtpNgay = Ctl<DateTimePicker>(f, "dtpNgayChieu");
+                var dtpGio = Ctl<DateTimePicker>(f, "dtpGioChieu");
+                var chkAuto = Ctl<CheckBox>(f, "chkTuNhayGio");
+                var btnSchedule = Ctl<Button>(f, "btnXepLich");
+                var dgv = Ctl<DataGridView>(f, "dgvLichPhong");
+                var lblToast = Ctl<Label>(f, "lblThongBao");
+
+                dtpNgay.MinDate = DateTimePicker.MinimumDateTime;
+                dtpNgay.Value = fakeNow.Date;
+                dtpGio.Value = fakeNow.Date.AddHours(9);
+                chkAuto.Checked = true;
+
+                int beforeRows = dgv.Rows.Count;
+                btnSchedule.PerformClick();
+
+                Assert.Equal(beforeRows + 1, dgv.Rows.Count);
+                Assert.Contains("Added:", lblToast.Text);
+                // Movie 1 = 181 min (09:00 -> 12:01) + 15 min buffer = 12:16 -> rounded to 12:20
+                Assert.True(dtpGio.Value.TimeOfDay >= new TimeSpan(12, 16, 0),
+                    $"Expected auto-jump >= 12:16, got {dtpGio.Value:HH:mm}");
+                f.Close();
+            }
+            finally
+            {
+                LichChieuService.Now = prevNow;
+                DataManager.DungRepository(prevRepo);
+            }
+        });
+
+        [Fact]
         public void ScheduleForm_EditMode_WithPastShowtime_DoesNotCrash() => RunSta(() =>
         {
             // Regression: DateTimePicker.MinDate = Today used to throw when loading an old showtime.

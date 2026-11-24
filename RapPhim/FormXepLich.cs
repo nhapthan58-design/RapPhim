@@ -7,6 +7,7 @@ namespace RapPhim
     public partial class FormXepLich : Form
     {
         private readonly LichChieu? _lichChieuDangSua = null;
+        private readonly System.Windows.Forms.Timer _timerThongBao;
         private bool _dangTaiDuLieu = false;     // suppress change events while loading
         private int _maXungDot = -1;             // showtime id highlighted as conflicting in the grid
 
@@ -15,9 +16,17 @@ namespace RapPhim
             InitializeComponent();
             dgvLichPhong.CellFormatting += dgvLichPhong_CellFormatting;
 
+            _timerThongBao = new System.Windows.Forms.Timer { Interval = 4000 };
+            _timerThongBao.Tick += (_, _) =>
+            {
+                _timerThongBao.Stop();
+                lblThongBao.Text = "";
+            };
+            FormClosed += (_, _) => _timerThongBao.Dispose();
+
             _dangTaiDuLieu = true;
             DataManager.TaiLai();
-            dtpGioChieu.Value = LamTronLen5Phut(DateTime.Now.AddMinutes(5));
+            dtpGioChieu.Value = LamTronLen5Phut(LichChieuService.Now().AddMinutes(5));
             LoadDuLieu();
             _dangTaiDuLieu = false;
 
@@ -34,9 +43,20 @@ namespace RapPhim
             btnXepLich.Text = "💾  UPDATE";
             btnXepLich.BackColor = Color.FromArgb(217, 119, 6); // Warm Amber Gold
             btnXemDanhSach.Visible = false;
+            chkTuNhayGio.Visible = false;
 
             NapGiaTriSuaVaoForm();
             LamMoiTatCa();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape)
+            {
+                Close();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         // =====================================================
@@ -81,6 +101,14 @@ namespace RapPhim
         }
 
         private int BoQuaMa => _lichChieuDangSua?.MaLichChieu ?? -1;
+
+        private void HienThongBaoNhe(string text, Color? color = null)
+        {
+            lblThongBao.ForeColor = color ?? Color.FromArgb(52, 211, 153);
+            lblThongBao.Text = text;
+            _timerThongBao.Stop();
+            _timerThongBao.Start();
+        }
 
         // =====================================================
         // EVENTS
@@ -168,7 +196,7 @@ namespace RapPhim
                     Start = l.GioBatDau.ToString("HH:mm"),
                     End = l.GioKetThuc.ToString("HH:mm"),
                     Duration = $"{l.ThoiLuongPhim} min",
-                    Tickets = l.SoVeDaBan
+                    Tickets = DataManager.VeDaBanProvider.DemVeDaBan(l.MaLichChieu)
                 })
                 .ToList();
 
@@ -179,15 +207,21 @@ namespace RapPhim
             grpLichPhong.Text = $" {tenPhong} - {ngay:dd/MM/yyyy} ({lichCuaPhong.Count} showtimes) ";
         }
 
-        /// <summary>Highlight the conflicting row (uses e.CellStyle only, never row.DefaultCellStyle).</summary>
+        /// <summary>Highlight conflicting row (rose) and edited row (amber) using e.CellStyle only.</summary>
         private void dgvLichPhong_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.RowIndex < 0 || e.RowIndex >= dgvLichPhong.Rows.Count || e.CellStyle == null) return;
+            if (dgvLichPhong.Rows[e.RowIndex].DataBoundItem is not PhongLichViewModel vm) return;
 
-            if (dgvLichPhong.Rows[e.RowIndex].DataBoundItem is PhongLichViewModel vm && vm.ID == _maXungDot)
+            if (vm.ID == _maXungDot)
             {
                 e.CellStyle.BackColor = Color.FromArgb(76, 5, 25);
                 e.CellStyle.ForeColor = Color.FromArgb(254, 205, 211);
+            }
+            else if (_lichChieuDangSua != null && vm.ID == _lichChieuDangSua.MaLichChieu)
+            {
+                e.CellStyle.BackColor = Color.FromArgb(59, 42, 7);       // #3B2A07 amber tint
+                e.CellStyle.ForeColor = Color.FromArgb(252, 211, 77);    // #FCD34D warm gold
             }
         }
 
@@ -225,24 +259,49 @@ namespace RapPhim
             {
                 var kq = LichChieuService.CapNhat(_lichChieuDangSua.MaLichChieu, maPhim, maPhong, gioBatDau);
 
-                MessageBox.Show(kq.ThongBao, kq.ThanhCong ? "Success" : "Error",
-                    MessageBoxButtons.OK, kq.ThanhCong ? MessageBoxIcon.Information : MessageBoxIcon.Error);
-
                 if (kq.ThanhCong)
                 {
                     DialogResult = DialogResult.OK;
                     Close();
                 }
+                else
+                {
+                    MessageBox.Show(kq.ThongBao, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
             }
-            else
+
+            // ADD MODE — non-blocking success + optional auto-jump to next free slot
+            var kqThem = LichChieuService.Them(maPhim, maPhong, gioBatDau);
+            if (!kqThem.ThanhCong)
             {
-                var kq = LichChieuService.Them(maPhim, maPhong, gioBatDau);
-
-                MessageBox.Show(kq.ThongBao, kq.ThanhCong ? "Success" : "Error",
-                    MessageBoxButtons.OK, kq.ThanhCong ? MessageBoxIcon.Information : MessageBoxIcon.Error);
-
+                MessageBox.Show(kqThem.ThongBao, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 LamMoiTatCa();
+                return;
             }
+
+            var phim = cboPhim.SelectedItem as Phim;
+            DateTime gioKetThuc = phim != null ? gioBatDau.AddMinutes(phim.ThoiLuong) : gioBatDau;
+            string tenPhim = phim?.TenPhim ?? "Showtime";
+            string thongBao = $"✓ Added: {tenPhim} ({gioBatDau:HH:mm}–{gioKetThuc:HH:mm})";
+
+            if (chkTuNhayGio.Checked)
+            {
+                var tiepTheo = LichChieuService.GoiYGioTrong(maPhim, maPhong, gioKetThuc);
+                if (tiepTheo.HasValue)
+                {
+                    _dangTaiDuLieu = true;
+                    dtpGioChieu.Value = tiepTheo.Value;
+                    _dangTaiDuLieu = false;
+                }
+                else
+                {
+                    thongBao += "  ·  No free slot left today in this room.";
+                }
+            }
+
+            LamMoiTatCa();
+            HienThongBaoNhe(thongBao);
         }
 
         private void btnXoaForm_Click(object? sender, EventArgs e)
@@ -257,7 +316,7 @@ namespace RapPhim
                 if (cboPhim.Items.Count > 0) cboPhim.SelectedIndex = 0;
                 if (cboPhong.Items.Count > 0) cboPhong.SelectedIndex = 0;
                 dtpNgayChieu.Value = DateTime.Today;
-                dtpGioChieu.Value = LamTronLen5Phut(DateTime.Now.AddMinutes(5));
+                dtpGioChieu.Value = LamTronLen5Phut(LichChieuService.Now().AddMinutes(5));
             }
             _dangTaiDuLieu = false;
             LamMoiTatCa();
