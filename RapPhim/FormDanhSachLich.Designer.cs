@@ -36,6 +36,7 @@ namespace RapPhim
             dgvDanhSach = new DataGridView();
 
             panelBottom = new Panel();
+            btnSaoChep = new Button();
             btnSua = new Button();
             btnXoa = new Button();
             btnDong = new Button();
@@ -178,13 +179,25 @@ namespace RapPhim
             panelBottom.BackColor = Color.FromArgb(24, 24, 28);
             panelBottom.Location = new Point(0, 535);
             panelBottom.Size = new Size(1060, 60);
-            panelBottom.Controls.AddRange(new Control[] { lblTongSuat, lblLyDoKhoa, btnSua, btnXoa, btnDong });
+            panelBottom.Controls.AddRange(new Control[] { lblTongSuat, lblLyDoKhoa, btnSaoChep, btnSua, btnXoa, btnDong });
 
             lblLyDoKhoa.Text = "";
             lblLyDoKhoa.Font = new Font("Segoe UI", 9.5F, FontStyle.Italic);
             lblLyDoKhoa.ForeColor = Color.FromArgb(251, 191, 36);
             lblLyDoKhoa.Location = new Point(230, 21);
-            lblLyDoKhoa.Size = new Size(410, 22);
+            lblLyDoKhoa.Size = new Size(300, 22);
+
+            // btnSaoChep - Copy Day button
+            btnSaoChep.Text = "📑 Copy Day";
+            btnSaoChep.Font = new Font("Segoe UI Bold", 9.5F, FontStyle.Bold);
+            btnSaoChep.BackColor = Color.FromArgb(79, 70, 229);
+            btnSaoChep.ForeColor = Color.White;
+            btnSaoChep.FlatStyle = FlatStyle.Flat;
+            btnSaoChep.FlatAppearance.BorderSize = 0;
+            btnSaoChep.Location = new Point(535, 10);
+            btnSaoChep.Size = new Size(115, 40);
+            btnSaoChep.Cursor = Cursors.Hand;
+            btnSaoChep.Click += btnSaoChep_Click;
 
             lblTongSuat.Text = "Total: 0 showtimes";
             lblTongSuat.Font = new Font("Segoe UI Semibold", 10.5F, FontStyle.Bold);
@@ -272,6 +285,7 @@ namespace RapPhim
         private DataGridView dgvDanhSach;
 
         private Panel panelBottom;
+        private Button btnSaoChep;
         private Button btnSua;
         private Button btnXoa;
         private Button btnDong;

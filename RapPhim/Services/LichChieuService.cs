@@ -330,6 +330,48 @@ namespace RapPhim.Services
             return null;
         }
 
+        /// <summary>
+        /// Copy all showtimes starting on <paramref name="tuNgay"/> (optionally for one room) to <paramref name="denNgay"/>.
+        /// Conflicts or past times are recorded in <see cref="KetQuaSaoChep.BoQua"/> without stopping the batch.
+        /// Copied showtimes always start with 0 sold tickets.
+        /// </summary>
+        public static KetQuaSaoChep SaoChepLichNgay(DateTime tuNgay, DateTime denNgay, int? maPhong = null)
+        {
+            var boQua = new List<string>();
+            if (tuNgay.Date == denNgay.Date)
+            {
+                boQua.Add("Source date and target date must be different.");
+                return new KetQuaSaoChep(0, boQua);
+            }
+
+            DataManager.TaiLai();
+            var nguon = DataManager.DanhSachLichChieu
+                .Where(l => l.GioBatDau.Date == tuNgay.Date)
+                .Where(l => !maPhong.HasValue || l.MaPhong == maPhong.Value)
+                .OrderBy(l => l.GioBatDau)
+                .ToList();
+
+            int soTaoMoi = 0;
+            foreach (var l in nguon)
+            {
+                DateTime gioMoi = denNgay.Date.Add(l.GioBatDau.TimeOfDay);
+                var kq = Them(l.MaPhim, l.MaPhong, gioMoi);
+                if (kq.ThanhCong)
+                {
+                    soTaoMoi++;
+                }
+                else
+                {
+                    string lyDo = kq.LichXungDot != null
+                        ? $"Conflicts with {kq.LichXungDot.TenPhim} ({kq.LichXungDot.GioBatDau:HH:mm}-{kq.LichXungDot.GioKetThuc:HH:mm})"
+                        : kq.ThongBao.Split('\n')[0];
+                    boQua.Add($"{l.GioBatDau:HH:mm} {l.TenPhim} @ {l.TenPhong}: {lyDo}");
+                }
+            }
+
+            return new KetQuaSaoChep(soTaoMoi, boQua);
+        }
+
         // =====================================================
         // READ API FOR THE TICKET-SALES SCREEN (Sỹ Anh)
         // =====================================================

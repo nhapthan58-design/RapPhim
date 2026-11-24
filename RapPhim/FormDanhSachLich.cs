@@ -247,6 +247,15 @@ namespace RapPhim
             if (kq.ThanhCong) LoadDanhSach();
         }
 
+        private void btnSaoChep_Click(object? sender, EventArgs e)
+        {
+            DateTime? ngayNguon = chkTatCaNgay.Checked ? null : dtpLocNgay.Value.Date;
+            using var dlg = new FormSaoChepLich(ngayNguon);
+            dlg.ShowDialog(this);
+            DataManager.TaiLai();
+            LoadDanhSach();
+        }
+
         private void btnDong_Click(object? sender, EventArgs e) => Close();
     }
 }
